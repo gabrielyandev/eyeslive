@@ -1,0 +1,5 @@
+/target/
+/downloads/
+*.pdb
+*.log
+.DS_Store
