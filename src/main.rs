@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 //! EyesLive — Native Rust Remote Desktop Application
 //! Created & Signed by Gabriel Yan (@gabrielyandev)
 //! GitHub: https://github.com/gabrielyandev/eyeslive
@@ -11,6 +13,7 @@
 mod host;
 mod protocol;
 mod relay;
+mod updater;
 mod viewer;
 
 use eframe::egui;
@@ -25,6 +28,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use updater::{
+    apply_update_and_restart, check_for_updates_sync, download_update_sync, UpdateStatus,
+    CURRENT_VERSION, GITHUB_RELEASES_PAGE,
+};
 use viewer::RemoteSession;
 
 fn detect_local_ip() -> String {
@@ -54,6 +61,12 @@ fn open_browser_url(url: &str) {
 }
 
 fn main() -> eframe::Result<()> {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows::Win32::System::Console::{AttachConsole, ATTACH_PARENT_PROCESS};
+        let _ = AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+
     let args: Vec<String> = std::env::args().collect();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -113,6 +126,10 @@ struct EyesLiveApp {
     sessions: Vec<RemoteSession>,
     active_tab: usize,
     next_session_id: usize,
+
+    // Auto-update system
+    update_status: Arc<Mutex<UpdateStatus>>,
+    show_update_banner: bool,
 }
 
 impl EyesLiveApp {
@@ -147,6 +164,27 @@ impl EyesLiveApp {
             let _ = start_host_listener(DEFAULT_HOST_PORT, host_cfg).await;
         });
 
+        // Background update check on startup
+        let update_status = Arc::new(Mutex::new(UpdateStatus::Idle));
+        let checker_clone = update_status.clone();
+        rt.spawn(async move {
+            *checker_clone.lock().unwrap() = UpdateStatus::Checking;
+            match tokio::task::spawn_blocking(check_for_updates_sync).await {
+                Ok(Ok(Some(info))) => {
+                    *checker_clone.lock().unwrap() = UpdateStatus::Available(info);
+                }
+                Ok(Ok(None)) => {
+                    *checker_clone.lock().unwrap() = UpdateStatus::UpToDate;
+                }
+                Ok(Err(e)) => {
+                    *checker_clone.lock().unwrap() = UpdateStatus::Error(e.to_string());
+                }
+                Err(e) => {
+                    *checker_clone.lock().unwrap() = UpdateStatus::Error(e.to_string());
+                }
+            }
+        });
+
         Self {
             rt,
             my_desk_id,
@@ -163,7 +201,30 @@ impl EyesLiveApp {
             sessions: Vec::new(),
             active_tab: 0,
             next_session_id: 1,
+            update_status,
+            show_update_banner: true,
         }
+    }
+
+    fn trigger_manual_update_check(&self) {
+        let checker = self.update_status.clone();
+        self.rt.spawn(async move {
+            *checker.lock().unwrap() = UpdateStatus::Checking;
+            match tokio::task::spawn_blocking(check_for_updates_sync).await {
+                Ok(Ok(Some(info))) => {
+                    *checker.lock().unwrap() = UpdateStatus::Available(info);
+                }
+                Ok(Ok(None)) => {
+                    *checker.lock().unwrap() = UpdateStatus::UpToDate;
+                }
+                Ok(Err(e)) => {
+                    *checker.lock().unwrap() = UpdateStatus::Error(e.to_string());
+                }
+                Err(e) => {
+                    *checker.lock().unwrap() = UpdateStatus::Error(e.to_string());
+                }
+            }
+        });
     }
 
     fn spawn_new_session(&mut self) {
@@ -200,6 +261,91 @@ impl EyesLiveApp {
 impl eframe::App for EyesLiveApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint_after(Duration::from_millis(16));
+
+        // Auto-update banner notification
+        let cur_update = self.update_status.lock().unwrap().clone();
+        match cur_update {
+            UpdateStatus::Available(ref info) if self.show_update_banner => {
+                egui::TopBottomPanel::top("update_notification_banner").show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "🎉 Nova versão disponível: {} (versão atual: v{})!",
+                                info.latest_version, CURRENT_VERSION
+                            ))
+                            .color(egui::Color32::from_rgb(250, 204, 21))
+                            .strong(),
+                        );
+
+                        if let Some(exe_url) = info.exe_download_url.clone() {
+                            let status_clone = self.update_status.clone();
+                            let rt_handle = self.rt.handle().clone();
+                            if ui
+                                .button(
+                                    egui::RichText::new("⚡ Baixar e Atualizar Automaticamente (.exe)")
+                                        .color(egui::Color32::from_rgb(74, 222, 128))
+                                        .strong(),
+                                )
+                                .clicked()
+                            {
+                                rt_handle.spawn(async move {
+                                    let _ = tokio::task::spawn_blocking(move || {
+                                        download_update_sync(&exe_url, status_clone)
+                                    })
+                                    .await;
+                                });
+                            }
+                        }
+
+                        if ui.button("🌐 Ver Notas da Versão").clicked() {
+                            open_browser_url(&info.release_url);
+                        }
+
+                        if ui.small_button("✖").clicked() {
+                            self.show_update_banner = false;
+                        }
+                    });
+                });
+            }
+            UpdateStatus::Downloading(progress) => {
+                egui::TopBottomPanel::top("download_progress_banner").show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Baixando nova versão do EyesLive: {:.0}%...",
+                                progress * 100.0
+                            ))
+                            .strong(),
+                        );
+                        ui.add(egui::ProgressBar::new(progress).desired_width(200.0));
+                    });
+                });
+            }
+            UpdateStatus::ReadyToRestart(ref new_exe) => {
+                let exe_to_run = new_exe.clone();
+                egui::TopBottomPanel::top("ready_restart_banner").show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("✅ Nova versão baixada com sucesso!")
+                                .color(egui::Color32::from_rgb(74, 222, 128))
+                                .strong(),
+                        );
+                        if ui
+                            .button(
+                                egui::RichText::new("🚀 Reiniciar Agora com a Nova Versão")
+                                    .color(egui::Color32::GREEN)
+                                    .strong(),
+                            )
+                            .clicked()
+                        {
+                            let _ = apply_update_and_restart(&exe_to_run);
+                        }
+                    });
+                });
+            }
+            _ => {}
+        }
 
         // Top Bar with Multi-Tab Navigation & Clickable @gabrielyandev GitHub Link
         egui::TopBottomPanel::top("top_tab_bar").show(ctx, |ui| {
@@ -260,19 +406,67 @@ impl eframe::App for EyesLiveApp {
             });
         });
 
-        // Bottom Status Bar with Credits & Clickable GitHub Buttons
+        // Bottom Status Bar with Version, Update Indicator & Clickable GitHub Buttons
         egui::TopBottomPanel::bottom("bottom_status_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 let inc = *self.active_incoming.lock().unwrap();
                 let hstatus = self.host_status.lock().unwrap().clone();
                 ui.label(format!(
-                    "Host: {} (IP Local: {}:{}) | Clientes Conectados a Você: {} | Abas Abertas: {}",
+                    "Host: {} (IP: {}:{}) | Clientes: {} | Abas: {}",
                     hstatus,
                     self.local_ip,
                     *self.bound_port.lock().unwrap(),
                     inc,
                     self.sessions.len()
                 ));
+
+                ui.separator();
+
+                let cur_up = self.update_status.lock().unwrap().clone();
+                match cur_up {
+                    UpdateStatus::Checking => {
+                        ui.spinner();
+                        ui.label("Verificando atualizações...");
+                    }
+                    UpdateStatus::Available(ref info) => {
+                        if ui
+                            .small_button(
+                                egui::RichText::new(format!("🔔 Atualização {} Disponível!", info.latest_version))
+                                    .color(egui::Color32::from_rgb(250, 204, 21))
+                                    .strong(),
+                            )
+                            .on_hover_text("Clique para reabrir o aviso ou baixar")
+                            .clicked()
+                        {
+                            self.show_update_banner = true;
+                        }
+                    }
+                    UpdateStatus::UpToDate => {
+                        if ui
+                            .small_button(format!("✅ v{} (Atualizado)", CURRENT_VERSION))
+                            .on_hover_text("Versão mais recente. Clique para rechecar.")
+                            .clicked()
+                        {
+                            self.trigger_manual_update_check();
+                        }
+                    }
+                    UpdateStatus::Downloading(p) => {
+                        ui.label(format!("⏳ Baixando: {:.0}%", p * 100.0));
+                    }
+                    UpdateStatus::ReadyToRestart(_) => {
+                        ui.label(egui::RichText::new("🚀 Pronto para reiniciar!").color(egui::Color32::GREEN));
+                    }
+                    _ => {
+                        if ui
+                            .small_button(format!("v{} • Checar Atualizações", CURRENT_VERSION))
+                            .on_hover_text("Clique para verificar se há nova versão no GitHub")
+                            .clicked()
+                        {
+                            self.trigger_manual_update_check();
+                        }
+                    }
+                }
+
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
                         .small_button("🌐 GitHub @gabrielyandev")
@@ -398,6 +592,34 @@ impl EyesLiveApp {
         ui.group(|ui| {
             ui.horizontal(|ui| {
                 ui.label(
+                    egui::RichText::new(format!("🔄 EyesLive Desktop v{}", CURRENT_VERSION))
+                        .strong(),
+                );
+                ui.separator();
+                if ui
+                    .button("🔍 Checar Atualizações no Repositório")
+                    .on_hover_text("Consulta se há novas versões ou alterações publicadas no GitHub")
+                    .clicked()
+                {
+                    self.trigger_manual_update_check();
+                }
+                if ui
+                    .button(
+                        egui::RichText::new("⬇ Baixar Executável Portátil (.exe)")
+                            .color(egui::Color32::from_rgb(56, 189, 248)),
+                    )
+                    .on_hover_text("Abrir página de download direto do executável no GitHub Releases")
+                    .clicked()
+                {
+                    open_browser_url(GITHUB_RELEASES_PAGE);
+                }
+            });
+        });
+
+        ui.add_space(8.0);
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(
                     egui::RichText::new(format!(
                         "👨‍💻 Desenvolvido por {} ({})",
                         AUTHOR_NAME, AUTHOR_SIGNATURE
@@ -426,15 +648,19 @@ impl EyesLiveApp {
         session: &mut RemoteSession,
         rt: &tokio::runtime::Handle,
     ) {
-        let (status, remote_w, remote_h, remote_clip, file_ack, frames_rx) = {
+        let (status, remote_w, remote_h, remote_clip, file_ack, frames_rx, ping_rtt) = {
             let mut st = session.state.lock().unwrap();
             if st.frame_dirty {
                 if let Some(img) = st.latest_frame.take() {
-                    session.texture = Some(ctx.load_texture(
-                        format!("remote_screen_{}", session.id),
-                        img,
-                        egui::TextureOptions::LINEAR,
-                    ));
+                    if let Some(tex) = &mut session.texture {
+                        tex.set(img, egui::TextureOptions::LINEAR);
+                    } else {
+                        session.texture = Some(ctx.load_texture(
+                            format!("remote_screen_{}", session.id),
+                            img,
+                            egui::TextureOptions::LINEAR,
+                        ));
+                    }
                 }
                 st.frame_dirty = false;
             }
@@ -445,16 +671,78 @@ impl EyesLiveApp {
                 st.remote_clipboard.clone(),
                 st.last_file_ack.clone(),
                 st.frames_received,
+                st.ping_rtt_ms,
             )
         };
+
+        // Automatic periodic keepalive ping to gauge latency
+        if session.last_ping_sent.elapsed() >= Duration::from_millis(1500) {
+            session.last_ping_sent = Instant::now();
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            let _ = session.tx.send(Packet::Ping(now_ms));
+        }
 
         // Session Toolbar
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(&status).strong());
+
+            if let Some(rtt) = ping_rtt {
+                let (color, icon) = if rtt < 40 {
+                    (egui::Color32::from_rgb(74, 222, 128), "🟢")
+                } else if rtt < 100 {
+                    (egui::Color32::from_rgb(250, 204, 21), "🟡")
+                } else {
+                    (egui::Color32::from_rgb(248, 113, 113), "🔴")
+                };
+                ui.label(
+                    egui::RichText::new(format!("{} Ping: {}ms", icon, rtt))
+                        .color(color)
+                        .strong(),
+                );
+            }
+
             ui.label(format!("| Quadros: {}", frames_rx));
             ui.separator();
 
             let mut changed = false;
+
+            // One-click performance presets
+            if ui
+                .small_button("⚡ Modo Rápido")
+                .on_hover_text("Máxima velocidade e menor latência (30 FPS, JPEG 50, Escala 75%)")
+                .clicked()
+            {
+                session.fps_setting = 30;
+                session.quality_setting = 50;
+                session.scale_setting = 75;
+                changed = true;
+            }
+            if ui
+                .small_button("⚖ Equilibrado")
+                .on_hover_text("Boa imagem e baixa latência (25 FPS, JPEG 65, Escala 75%)")
+                .clicked()
+            {
+                session.fps_setting = 25;
+                session.quality_setting = 65;
+                session.scale_setting = 75;
+                changed = true;
+            }
+            if ui
+                .small_button("🎨 Alta Resolução")
+                .on_hover_text("100% Nativo sem escala e mais detalhes (20 FPS, JPEG 80, Escala 100%)")
+                .clicked()
+            {
+                session.fps_setting = 20;
+                session.quality_setting = 80;
+                session.scale_setting = 100;
+                changed = true;
+            }
+
+            ui.separator();
+
             changed |= ui
                 .add(egui::Slider::new(&mut session.fps_setting, 5..=60).text("FPS"))
                 .changed();
@@ -462,6 +750,9 @@ impl EyesLiveApp {
                 .add(
                     egui::Slider::new(&mut session.quality_setting, 20..=95).text("Qualidade JPEG"),
                 )
+                .changed();
+            changed |= ui
+                .add(egui::Slider::new(&mut session.scale_setting, 40..=100).text("Escala %"))
                 .changed();
             changed |= ui
                 .checkbox(&mut session.view_only, "Somente Visualização")
@@ -472,6 +763,7 @@ impl EyesLiveApp {
                     fps: session.fps_setting,
                     jpeg_quality: session.quality_setting,
                     view_only: session.view_only,
+                    scale_pct: session.scale_setting,
                 });
             }
 
@@ -525,9 +817,9 @@ impl EyesLiveApp {
                     let nx = ((pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0);
                     let ny = ((pos.y - rect.min.y) / rect.height()).clamp(0.0, 1.0);
 
-                    let moved = (nx - session.last_mouse_pos.0).abs() > 0.002
-                        || (ny - session.last_mouse_pos.1).abs() > 0.002;
-                    if moved && session.last_mouse_sent.elapsed() >= Duration::from_millis(30) {
+                    let moved = (nx - session.last_mouse_pos.0).abs() > 0.001
+                        || (ny - session.last_mouse_pos.1).abs() > 0.001;
+                    if moved && session.last_mouse_sent.elapsed() >= Duration::from_millis(16) {
                         session.last_mouse_pos = (nx, ny);
                         session.last_mouse_sent = Instant::now();
                         let _ = session.tx.send(Packet::MouseMove {

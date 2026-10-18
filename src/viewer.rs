@@ -13,15 +13,18 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 pub struct RemoteSession {
     pub id: usize,
+    #[allow(dead_code)]
     pub target: String,
     pub state: Arc<Mutex<SessionState>>,
     pub tx: UnboundedSender<Packet>,
     pub texture: Option<egui::TextureHandle>,
     pub fps_setting: u8,
     pub quality_setting: u8,
+    pub scale_setting: u8,
     pub view_only: bool,
     pub last_mouse_pos: (f32, f32),
     pub last_mouse_sent: Instant,
+    pub last_ping_sent: Instant,
 }
 
 pub struct SessionState {
@@ -36,6 +39,7 @@ pub struct SessionState {
     pub frames_received: u64,
     pub remote_clipboard: String,
     pub last_file_ack: Option<String>,
+    pub ping_rtt_ms: Option<u64>,
 }
 
 impl RemoteSession {
@@ -61,6 +65,7 @@ impl RemoteSession {
             frames_received: 0,
             remote_clipboard: String::new(),
             last_file_ack: None,
+            ping_rtt_ms: None,
         }));
 
         let state_clone = state.clone();
@@ -81,11 +86,13 @@ impl RemoteSession {
             state,
             tx,
             texture: None,
-            fps_setting: 25,
-            quality_setting: 70,
+            fps_setting: 30,
+            quality_setting: 55,
+            scale_setting: 75,
             view_only: is_loopback,
             last_mouse_pos: (-1.0, -1.0),
             last_mouse_sent: Instant::now(),
+            last_ping_sent: Instant::now(),
         }
     }
 
@@ -149,8 +156,12 @@ async fn run_viewer_connection(
             _ => anyhow::bail!("Resposta inesperada do Relay"),
         }
     } else {
-        let addr = format!("127.0.0.1:{}", crate::protocol::DEFAULT_HOST_PORT);
-        TcpStream::connect(&addr).await?
+        anyhow::bail!(
+            "Para conectar usando EyesLive ID ('{}'), marque a opção 'Usar Servidor Relay por ID' e configure o endereço do Relay, ou conecte diretamente via IP:Porta (ex: {}:{})",
+            target,
+            target,
+            crate::protocol::DEFAULT_HOST_PORT
+        );
     };
 
     let _ = stream.set_nodelay(true);
@@ -232,6 +243,15 @@ async fn run_viewer_connection(
             } => {
                 let mut st = state.lock().unwrap();
                 st.last_file_ack = Some(format!("Salvo '{}' em {}", file_name, saved_path));
+            }
+            Packet::Pong(sent_ts) => {
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let rtt = now_ms.saturating_sub(sent_ts);
+                let mut st = state.lock().unwrap();
+                st.ping_rtt_ms = Some(rtt);
             }
             _ => {}
         }

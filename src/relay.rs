@@ -25,6 +25,7 @@ pub async fn run_relay_server(bind_addr: &str) -> anyhow::Result<()> {
 
     loop {
         let (mut stream, peer) = listener.accept().await?;
+        let _ = stream.set_nodelay(true);
         let hosts = hosts.clone();
         tokio::spawn(async move {
             match recv_packet(&mut stream).await {
@@ -45,6 +46,7 @@ pub async fn run_relay_server(bind_addr: &str) -> anyhow::Result<()> {
                     let clean_id = normalize_id(&target_desk_id);
                     let maybe_host = hosts.lock().await.remove(&clean_id);
                     if let Some(mut host_stream) = maybe_host {
+                        let _ = host_stream.set_nodelay(true);
                         let _ = send_packet(
                             &mut stream,
                             &Packet::RelayStatus {

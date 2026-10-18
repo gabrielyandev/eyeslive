@@ -52,6 +52,7 @@ pub enum Packet {
         fps: u8,
         jpeg_quality: u8,
         view_only: bool,
+        scale_pct: u8,
     },
 
     // Remote Input Injection
