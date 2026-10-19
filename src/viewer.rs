@@ -196,7 +196,7 @@ async fn run_viewer_connection(
             st.remote_width = screen_width;
             st.remote_height = screen_height;
             st.status_text = format!(
-                "🟢 Conectado a {} (ID {}) — Sessão Ilimitada",
+                "ONLINE — Conectado a {} (ID {}) — Sessao Ilimitada",
                 host_name, desk_id
             );
         }

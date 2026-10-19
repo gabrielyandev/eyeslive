@@ -1,6 +1,7 @@
-//! GabrielDesk Host Engine — by @gabrielyandev
-//! Handles unlimited simultaneous incoming remote desktop sessions, real-time JPEG screen
-//! streaming, mouse/keyboard injection, clipboard synchronization, and file reception.
+//! EyesLive Host Engine — Created by Gabriel Yan (@gabrielyandev)
+//! GitHub: https://github.com/gabrielyandev/eyeslive
+//! Handles unlimited simultaneous incoming remote desktop sessions, interactive user consent
+//! prompts, real-time JPEG screen streaming, mouse/keyboard injection, clipboard sync, and file reception.
 
 use crate::protocol::{recv_packet, send_packet, MouseBtn, Packet, AUTHOR_SIGNATURE};
 use arboard::Clipboard;
@@ -11,10 +12,29 @@ use screenshots::Screen;
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::oneshot;
+
+static NEXT_CONSENT_ID: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsentDecision {
+    AllowFullControl,
+    AllowViewOnly,
+    Reject,
+}
+
+pub struct PendingConsent {
+    pub id: u64,
+    pub client_name: String,
+    pub peer_addr: String,
+    pub requested_at: Instant,
+    pub response_tx: Option<oneshot::Sender<ConsentDecision>>,
+}
 
 #[derive(Clone)]
 pub struct HostConfig {
@@ -22,6 +42,8 @@ pub struct HostConfig {
     pub host_name: String,
     pub pin: Arc<Mutex<String>>,
     pub allow_control: Arc<Mutex<bool>>,
+    pub require_consent: Arc<Mutex<bool>>,
+    pub pending_consents: Arc<Mutex<Vec<PendingConsent>>>,
     pub active_clients: Arc<Mutex<usize>>,
     pub bound_port: Arc<Mutex<u16>>,
     pub host_status: Arc<Mutex<String>>,
@@ -54,26 +76,34 @@ pub async fn start_host_listener(base_port: u16, config: HostConfig) -> anyhow::
     };
 
     loop {
-        let (stream, _peer) = listener.accept().await?;
+        let (stream, peer) = listener.accept().await?;
         let _ = stream.set_nodelay(true);
+        let peer_str = peer.to_string();
         let cfg = config.clone();
         tokio::spawn(async move {
-            let _ = handle_client_session(stream, cfg).await;
+            let _ = handle_client_session(stream, peer_str, cfg).await;
         });
     }
 }
 
-pub async fn handle_client_session(mut stream: TcpStream, config: HostConfig) -> anyhow::Result<()> {
-    // 1. Handshake (No account login required; optional PIN check only if configured)
+pub async fn handle_client_session(
+    mut stream: TcpStream,
+    peer_addr: String,
+    config: HostConfig,
+) -> anyhow::Result<()> {
+    // 1. Handshake (Optional PIN check + Interactive User Consent Modal)
     let hello = recv_packet(&mut stream).await?;
     let expected_pin = config.pin.lock().unwrap().trim().to_string();
-    let pin_ok = match hello {
-        Packet::Hello { pin, .. } => {
-            if expected_pin.is_empty() {
+    let (client_name, pin_ok) = match hello {
+        Packet::Hello {
+            client_name, pin, ..
+        } => {
+            let ok = if expected_pin.is_empty() {
                 true
             } else {
                 pin.as_deref() == Some(expected_pin.as_str())
-            }
+            };
+            (client_name, ok)
         }
         _ => anyhow::bail!("Expected Hello packet"),
     };
@@ -95,6 +125,62 @@ pub async fn handle_client_session(mut stream: TcpStream, config: HostConfig) ->
         )
         .await?;
         return Ok(());
+    }
+
+    // 2. Interactive User Consent Check (if require_consent is enabled on Host)
+    let mut session_force_view_only = false;
+    let ask_user = *config.require_consent.lock().unwrap();
+    if ask_user {
+        let req_id = NEXT_CONSENT_ID.fetch_add(1, Ordering::Relaxed);
+        let (tx, rx) = oneshot::channel::<ConsentDecision>();
+        {
+            let mut list = config.pending_consents.lock().unwrap();
+            list.push(PendingConsent {
+                id: req_id,
+                client_name: client_name.clone(),
+                peer_addr: peer_addr.clone(),
+                requested_at: Instant::now(),
+                response_tx: Some(tx),
+            });
+        }
+
+        let decision = match tokio::time::timeout(Duration::from_secs(60), rx).await {
+            Ok(Ok(d)) => d,
+            _ => {
+                // Remove expired request if still present
+                config
+                    .pending_consents
+                    .lock()
+                    .unwrap()
+                    .retain(|item| item.id != req_id);
+                ConsentDecision::Reject
+            }
+        };
+
+        match decision {
+            ConsentDecision::AllowFullControl => {
+                session_force_view_only = false;
+            }
+            ConsentDecision::AllowViewOnly => {
+                session_force_view_only = true;
+            }
+            ConsentDecision::Reject => {
+                send_packet(
+                    &mut stream,
+                    &Packet::Welcome {
+                        host_name: config.host_name,
+                        desk_id: config.desk_id,
+                        screen_width: scr_w,
+                        screen_height: scr_h,
+                        accepted: false,
+                        reason: Some("Conexao recusada pelo usuario do Host".into()),
+                        signature: AUTHOR_SIGNATURE.into(),
+                    },
+                )
+                .await?;
+                return Ok(());
+            }
+        }
     }
 
     send_packet(
@@ -121,7 +207,7 @@ pub async fn handle_client_session(mut stream: TcpStream, config: HostConfig) ->
     let fps = Arc::new(Mutex::new(30u8));
     let quality = Arc::new(Mutex::new(55u8));
     let scale_pct = Arc::new(Mutex::new(75u8));
-    let view_only = Arc::new(Mutex::new(false));
+    let view_only = Arc::new(Mutex::new(session_force_view_only));
 
     // Dedicated cancel-safe reader task for client input/files
     let fps_r = fps.clone();
@@ -135,6 +221,10 @@ pub async fn handle_client_session(mut stream: TcpStream, config: HostConfig) ->
     let reader_handle = tokio::spawn(async move {
         let mut enigo: Option<Enigo> = Enigo::new(&Settings::default()).ok();
         while let Ok(pkt) = recv_packet(&mut reader).await {
+            let can_inject = !session_force_view_only
+                && *allow_ctrl.lock().unwrap()
+                && !*view_only_r.lock().unwrap();
+
             match pkt {
                 Packet::StreamConfig {
                     fps: new_fps,
@@ -144,11 +234,11 @@ pub async fn handle_client_session(mut stream: TcpStream, config: HostConfig) ->
                 } => {
                     *fps_r.lock().unwrap() = new_fps.clamp(1, 60);
                     *quality_r.lock().unwrap() = jpeg_quality.clamp(10, 95);
-                    *view_only_r.lock().unwrap() = vo;
+                    *view_only_r.lock().unwrap() = vo || session_force_view_only;
                     *scale_pct_r.lock().unwrap() = new_scale.clamp(30, 100);
                 }
                 Packet::MouseMove { norm_x, norm_y } => {
-                    if *allow_ctrl.lock().unwrap() && !*view_only_r.lock().unwrap() {
+                    if can_inject {
                         inject_mouse_move(&mut enigo, norm_x, norm_y, scr_w, scr_h);
                     }
                 }
@@ -158,25 +248,27 @@ pub async fn handle_client_session(mut stream: TcpStream, config: HostConfig) ->
                     norm_x,
                     norm_y,
                 } => {
-                    if *allow_ctrl.lock().unwrap() && !*view_only_r.lock().unwrap() {
-                        inject_mouse_button(&mut enigo, button, pressed, norm_x, norm_y, scr_w, scr_h);
+                    if can_inject {
+                        inject_mouse_button(
+                            &mut enigo, button, pressed, norm_x, norm_y, scr_w, scr_h,
+                        );
                     }
                 }
                 Packet::MouseScroll {
                     delta_x: _,
                     delta_y,
                 } => {
-                    if *allow_ctrl.lock().unwrap() && !*view_only_r.lock().unwrap() {
+                    if can_inject {
                         inject_mouse_scroll(&mut enigo, delta_y);
                     }
                 }
                 Packet::KeyEvent { key, pressed } => {
-                    if *allow_ctrl.lock().unwrap() && !*view_only_r.lock().unwrap() {
+                    if can_inject {
                         inject_key(&mut enigo, &key, pressed);
                     }
                 }
                 Packet::TextInput { text } => {
-                    if *allow_ctrl.lock().unwrap() && !*view_only_r.lock().unwrap() {
+                    if can_inject {
                         if enigo.is_none() {
                             enigo = Enigo::new(&Settings::default()).ok();
                         }

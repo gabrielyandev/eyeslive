@@ -1,5 +1,7 @@
 /target/
 /downloads/
+__pycache__/
+*.pyc
 *.pdb
 *.log
 .DS_Store
