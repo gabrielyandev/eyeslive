@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EyesLive — Acesso Remoto Gratuito, Sem Conta e Sem Limite de Tempo</title>
+  <meta name="description" content="EyesLive é uma plataforma nativa de acesso remoto em Rust para Windows. 100% gratuito, sem necessidade de conta ou login, sem limite de tempo de sessão e em executável único." />
+  <meta property="og:title" content="EyesLive — Acesso Remoto Sem Conta, Gratuito e Sem Limites" />
+  <meta property="og:description" content="Conecte-se por ID de 9 dígitos ou IP direto. Sem cadastro, sem assinaturas, sem cortes de sessão. Nativo em Rust para Windows 10 e 11." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <!-- Top Navigation -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#" class="brand" aria-label="EyesLive Página Inicial">
+        <span class="brand-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </span>
+        <span>EyesLive</span>
+        <span class="brand-version" id="nav-version">v1.1.1</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Navegação principal">
+        <a href="#sobre">Sobre</a>
+        <a href="#recursos">Recursos</a>
+        <a href="#comparativo">Comparativo</a>
+        <a href="#como-funciona">Como Usar</a>
+        <a href="#download">Download</a>
+      </nav>
+
+      <div class="header-actions">
+        <button type="button" class="icon-btn" id="page-theme-toggle" title="Alternar tema da página" aria-label="Alternar tema claro ou escuro">
+          <svg id="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+          </svg>
+        </button>
+
+        <a href="https://github.com/gabrielyandev/eyeslive" target="_blank" rel="noopener noreferrer" class="icon-btn" title="Repositório no GitHub" aria-label="Repositório no GitHub">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
+            <path d="M9 18c-4.51 2-5-2-7-2"/>
+          </svg>
+        </a>
+
+        <a href="https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe" class="btn btn-primary btn-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Baixar .EXE</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero" style="border-top: none;">
+      <div class="container">
+        <div class="hero-top">
+          <div class="announcement-pill">
+            <span class="status-dot"></span>
+            <span>Lançamento Oficial — Plataforma Nativa em Rust para Windows</span>
+          </div>
+
+          <h1 class="hero-title">
+            Acesso remoto direto.<br />
+            <span class="text-accent">Sem conta, gratuito e sem limites.</span>
+          </h1>
+
+          <p class="hero-subtitle">
+            O <strong>EyesLive</strong> conecta computadores remotamente via ID de 9 dígitos na nuvem ou endereço IP direto na rede local. Sem burocracia de cadastro, sem mensalidades e sem desconexões por tempo de sessão.
+          </p>
+
+          <div class="zero-pillars">
+            <div class="zero-badge">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>100% Gratuito</span>
+            </div>
+            <div class="zero-badge">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>Sem Conta ou Login</span>
+            </div>
+            <div class="zero-badge">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>Tempo de Sessão Ilimitado</span>
+            </div>
+            <div class="zero-badge">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>Executável Único (~7 MB)</span>
+            </div>
+          </div>
+
+          <div class="hero-cta-group">
+            <a href="https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe" class="btn btn-primary btn-lg" id="hero-download-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Baixar para Windows (64-bit)</span>
+            </a>
+
+            <a href="https://github.com/gabrielyandev/eyeslive" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+              <span>Ver Código-Fonte no GitHub</span>
+            </a>
+          </div>
+
+          <div class="hero-meta">
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              Windows 10 / 11 (x64)
+            </span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              Portátil ou Instalável em 1 Clique
+            </span>
+            <span id="hero-release-meta">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Versão Estável v1.1.1 (7.16 MB)
+            </span>
+          </div>
+        </div>
+
+        <!-- Interactive Faithful Preview of EyesLive Desktop Interface -->
+        <div class="app-showcase-wrapper" aria-label="Demonstração interativa da interface do EyesLive">
+          <div class="showcase-toolbar">
+            <div class="showcase-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+              </svg>
+              <span>Prévia Interativa do Software Nativo (Rust / egui)</span>
+            </div>
+
+            <div class="showcase-controls">
+              <button type="button" class="chip-btn" id="trigger-consent-demo">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>Testar Alerta de Segurança</span>
+              </button>
+              <button type="button" class="chip-btn" id="toggle-app-theme">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="5"/>
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2"/>
+                </svg>
+                <span id="app-theme-label">Tema do App: Escuro Suave</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="app-window" id="eyeslive-window">
+            <!-- Native Window Titlebar -->
+            <div class="window-titlebar">
+              <div class="window-title-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60afff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span>EyesLive — Acesso Remoto de Alta Performance</span>
+              </div>
+              <div class="window-controls" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </div>
+            </div>
+
+            <!-- App Internal Topbar with Multi-tab switcher -->
+            <div class="app-topbar">
+              <div class="app-tabs" role="tablist">
+                <button type="button" class="app-tab active" data-tab="home" role="tab" aria-selected="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  <span>Painel Inicial</span>
+                </button>
+                <button type="button" class="app-tab" data-tab="session" role="tab" aria-selected="false">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                  <span>Sessão #1: 462-152-868</span>
+                </button>
+              </div>
+
+              <div class="app-topbar-right">
+                <div class="relay-pill">
+                  <span class="status-dot"></span>
+                  <span>Relay Cloud Conectado • Porta 7878 Ativa</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- App Body -->
+            <div class="app-body">
+              <!-- Tab 0: Home Workspace -->
+              <div class="app-grid" id="tab-home">
+                <!-- Left Panel: Este Dispositivo (Host) -->
+                <div class="app-card">
+                  <div class="app-card-header">
+                    <div class="app-card-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60afff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                        <line x1="6" y1="6" x2="6.01" y2="6"/>
+                        <line x1="6" y1="18" x2="6.01" y2="18"/>
+                      </svg>
+                      <span>Este Dispositivo (Receber Acesso)</span>
+                    </div>
+                    <span class="app-badge">Pronto</span>
+                  </div>
+
+                  <div class="id-display-box">
+                    <div>
+                      <div class="id-label">Seu EyesLive ID</div>
+                      <div class="id-number" id="demo-desk-id">849-310-624</div>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                      <button type="button" class="app-small-btn" id="copy-demo-id" title="Copiar EyesLive ID">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        <span id="copy-demo-id-text">Copiar ID</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="app-kv-row">
+                    <div class="app-kv-item">
+                      <div class="id-label">IP Local (LAN / VPN)</div>
+                      <div class="app-kv-value">192.168.1.42:7878</div>
+                    </div>
+                    <div class="app-kv-item">
+                      <div class="id-label">PIN Opcional</div>
+                      <div class="app-kv-value" style="color: #94a3b8;">Desativado (Consentimento)</div>
+                    </div>
+                  </div>
+
+                  <div class="app-checks">
+                    <div class="app-check-row">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="4"/>
+                        <polyline points="9 12 11 14 15 10"/>
+                      </svg>
+                      <span>Exigir autorização na tela antes de conectar</span>
+                    </div>
+                    <div class="app-check-row">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="4"/>
+                        <polyline points="9 12 11 14 15 10"/>
+                      </svg>
+                      <span>Permitir controle de mouse, teclado e transferência</span>
+                    </div>
+                    <div class="app-check-row">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="4"/>
+                        <polyline points="9 12 11 14 15 10"/>
+                      </svg>
+                      <span>Manter ativo na Bandeja do Sistema (System Tray)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right Panel: Nova Conexão (Cliente) -->
+                <div class="app-card">
+                  <div class="app-card-header">
+                    <div class="app-card-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60afff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h6v6"/>
+                        <path d="M10 14 21 3"/>
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      </svg>
+                      <span>Acessar Computador Remoto</span>
+                    </div>
+                    <span class="app-badge">Zero Login</span>
+                  </div>
+
+                  <div class="app-input-group">
+                    <label for="mock-target-id">EyesLive ID (9 dígitos) ou Endereço IP:Porta</label>
+                    <input type="text" id="mock-target-id" class="app-input" value="462-152-868" readonly aria-label="EyesLive ID de destino" />
+                  </div>
+
+                  <div class="app-input-group">
+                    <label for="mock-target-pin">PIN de Segurança (se configurado no computador remoto)</label>
+                    <input type="password" id="mock-target-pin" class="app-input" placeholder="Em branco para solicitar autorização na tela" readonly aria-label="PIN de Segurança" />
+                  </div>
+
+                  <button type="button" class="app-connect-btn" id="demo-connect-btn">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <span>Conectar e Iniciar Sessão Remota</span>
+                  </button>
+
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; font-size: 0.76rem; color: #94a3b8;">
+                    <span>Sem limite de tempo • Multi-abas</span>
+                    <span>Criptografia e controle nativo</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab 1: Active Remote Session Simulation -->
+              <div class="remote-session-view" id="tab-session">
+                <div class="session-toolbar">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="status-dot"></span>
+                    <strong>Conectado a WORKSTATION-DEV (462-152-868)</strong>
+                    <span class="app-badge">Tempo de Sessão: 04:38:19 (Sem Limite)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span class="app-badge">Perfil: Equilibrado (60 FPS)</span>
+                    <span class="app-badge">Clipboard Sincronizado</span>
+                    <span class="app-badge">Enviar Arquivo</span>
+                  </div>
+                </div>
+
+                <div class="session-canvas">
+                  <div class="canvas-code-window">
+                    <div style="color: #60afff; margin-bottom: 8px; font-weight: 700;">// Área de Trabalho Remota em Tempo Real</div>
+                    <div>$ cargo build --release --target x86_64-pc-windows-msvc</div>
+                    <div style="color: #34d399;">   Compiling eyeslive v1.1.1 (C:\projects\eyeslive)</div>
+                    <div style="color: #34d399;">    Finished release [optimized] target(s) in 4.12s</div>
+                    <div style="margin-top: 10px;">$ eyeslive.exe --status</div>
+                    <div style="color: #94a3b8;">&gt; Host Listener: 0.0.0.0:7878 [ATIVO]</div>
+                    <div style="color: #94a3b8;">&gt; Cloud Relay: Registrado (ID 462-152-868)</div>
+                    <div style="color: #94a3b8;">&gt; Limite de Sessão: ILIMITADO</div>
+                  </div>
+
+                  <div class="canvas-metrics-panel">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">Telemetria da Transmissão</div>
+                    <div class="spec-row" style="padding-bottom: 6px;">
+                      <span class="spec-key">Latência de Rede</span>
+                      <span class="spec-val" style="color: #34d399;">14 ms</span>
+                    </div>
+                    <div class="spec-row" style="padding-bottom: 6px;">
+                      <span class="spec-key">Modo de Acesso</span>
+                      <span class="spec-val">Controle Completo</span>
+                    </div>
+                    <div class="spec-row" style="padding-bottom: 6px;">
+                      <span class="spec-key">Escala / Qualidade</span>
+                      <span class="spec-val">100% • Baixa Latência</span>
+                    </div>
+                    <div class="spec-row">
+                      <span class="spec-key">Custo / Licença</span>
+                      <span class="spec-val" style="color: #60afff;">Gratuito / Sem Conta</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Interactive Consent Modal Simulation -->
+              <div class="consent-modal-backdrop" id="consent-modal">
+                <div class="consent-modal" role="dialog" aria-labelledby="consent-title">
+                  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60afff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <h4 id="consent-title" style="font-size: 1.05rem; font-weight: 700;">Solicitação de Acesso Remoto</h4>
+                  </div>
+                  <p style="font-size: 0.86rem; color: #dbe4f0; margin-bottom: 12px;">
+                    O dispositivo <strong>SUPORTE-TECNICO (189.44.210.18)</strong> está solicitando conexão a este computador. Como deseja prosseguir?
+                  </p>
+                  <div class="consent-actions">
+                    <button type="button" class="consent-btn consent-btn-full" data-close-consent>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <span>Permitir Acesso Completo (Tela + Controle)</span>
+                    </button>
+                    <button type="button" class="consent-btn consent-btn-view" data-close-consent>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      <span>Permitir Somente Visualização</span>
+                    </button>
+                    <button type="button" class="consent-btn consent-btn-reject" data-close-consent>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                      <span>Recusar Conexão</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Core Philosophy Section: Why EyesLive -->
+    <section id="sobre">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-eyebrow">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>Sobre a Plataforma</span>
+          </div>
+          <h2 class="section-title">Criado para eliminar os bloqueios artificiais do acesso remoto.</h2>
+          <p class="section-desc">
+            Ferramentas tradicionais passaram a exigir cadastros extensos, limitar sessões gratuitas a poucos minutos e bloquear conexões legítimas. O EyesLive devolve a simplicidade de conectar dois computadores em segundos.
+          </p>
+        </div>
+
+        <div class="pillars-grid">
+          <article class="pillar-card">
+            <div class="pillar-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <h3>Não Precisa Pagar</h3>
+            <p>
+              Totalmente gratuito e de código aberto. Sem planos pagos ocultos, sem necessidade de cartão de crédito e sem alertas interrompendo seu suporte remoto por suposto uso comercial.
+            </p>
+          </article>
+
+          <article class="pillar-card">
+            <div class="pillar-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <line x1="17" y1="8" x2="22" y2="13"/>
+                <line x1="22" y1="8" x2="17" y2="13"/>
+              </svg>
+            </div>
+            <h3>Não Precisa de Conta</h3>
+            <p>
+              Zero formulários de registro, zero confirmação de e-mail e zero autenticação obrigatória em nuvem. Basta abrir o executável, informar o ID de 9 dígitos ou o IP e conectar imediatamente.
+            </p>
+          </article>
+
+          <article class="pillar-card">
+            <div class="pillar-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z"/>
+              </svg>
+            </div>
+            <h3>Sem Limite de Tempo</h3>
+            <p>
+              Trabalhe, preste suporte técnico ou monitore máquinas pelo tempo que precisar. Suas sessões permanecem ativas sem cronômetros regressivos, sem quedas forçadas e sem tempo de espera para reconectar.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Technical Features Grid -->
+    <section id="recursos">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-eyebrow">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/>
+              <polyline points="2 12 12 17 22 12"/>
+            </svg>
+            <span>Arquitetura &amp; Recursos</span>
+          </div>
+          <h2 class="section-title">Engenharia nativa em Rust para máxima fluidez.</h2>
+          <p class="section-desc">
+            Construído do zero sem dependências pesadas de navegador. Um único binário enxuto que entrega tudo o que você precisa em uma janela limpa.
+          </p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </div>
+            <h3>Conexão Híbrida: ID ou IP Direto</h3>
+            <p>
+              Use o <strong>EyesLive ID</strong> de 9 dígitos para conectar através da internet sem configurar roteadores, ou conecte direto via <strong>IP:Porta</strong> em redes locais (LAN) e VPNs com latência mínima.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+                <line x1="9" y1="4" x2="9" y2="10"/>
+                <line x1="15" y1="4" x2="15" y2="10"/>
+              </svg>
+            </div>
+            <h3>Múltiplas Sessões em Abas</h3>
+            <p>
+              Controle diversos computadores simultaneamente em abas independentes dentro da mesma janela, alternando entre estações de trabalho com apenas um clique.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <polyline points="9 12 11 14 15 10"/>
+              </svg>
+            </div>
+            <h3>Autorização na Tela e PIN</h3>
+            <p>
+              Ao receber uma conexão, escolha entre <strong>Acesso Completo</strong>, <strong>Somente Visualização</strong> ou <strong>Recusar</strong>. Para acesso não supervisionado, configure um PIN de Segurança.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <polyline points="9 15 12 12 15 15"/>
+              </svg>
+            </div>
+            <h3>Transferência de Arquivos &amp; Clipboard</h3>
+            <p>
+              Envie arquivos diretamente para a máquina remota e mantenha a área de transferência (textos copiados) sincronizada em tempo real entre os dois computadores.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+            <h3>Perfis de Qualidade em Tempo Real</h3>
+            <p>
+              Alterne instantaneamente entre <strong>Modo Rápido</strong>, <strong>Equilibrado</strong> e <strong>Alta Resolução</strong>, ou ajuste FPS, compressão e escala de imagem durante a sessão.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="M6 8h.01M10 8h.01M14 8h.01"/>
+              </svg>
+            </div>
+            <h3>Modo Portátil ou Bandeja do Sistema</h3>
+            <p>
+              Execute direto após baixar sem instalar nada, ou instale no sistema em 1 clique com inicialização automática junto ao Windows e ícone discreto na Bandeja do Sistema.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section id="comparativo">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-eyebrow">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            <span>Comparativo Direto</span>
+          </div>
+          <h2 class="section-title">Por que escolher o EyesLive?</h2>
+          <p class="section-desc">
+            Veja como o EyesLive se compara às ferramentas tradicionais de acesso remoto.
+          </p>
+        </div>
+
+        <div class="comparison-wrap">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Critério</th>
+                <th class="col-eyeslive">EyesLive Remote Desktop</th>
+                <th>Softwares Remotos Tradicionais</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Custo de Uso</strong></td>
+                <td class="col-eyeslive">
+                  <span class="cell-status good">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    100% Gratuito e Open Source
+                  </span>
+                </td>
+                <td>
+                  <span class="cell-status bad">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Assinaturas mensais caras por dispositivo
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Conta e Login Obrigatório</strong></td>
+                <td class="col-eyeslive">
+                  <span class="cell-status good">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Zero conta • Uso imediato
+                  </span>
+                </td>
+                <td>
+                  <span class="cell-status bad">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Exige cadastro, login e verificação
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Duração das Sessões</strong></td>
+                <td class="col-eyeslive">
+                  <span class="cell-status good">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Ilimitada (sem cortes ou bloqueios)
+                  </span>
+                </td>
+                <td>
+                  <span class="cell-status bad">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Desconexões a cada 5 min no plano gratuito
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Conexão Direta em Rede Local (LAN)</strong></td>
+                <td class="col-eyeslive">
+                  <span class="cell-status good">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Nativa via IP:Porta (mesmo sem internet)
+                  </span>
+                </td>
+                <td>
+                  <span class="cell-status bad">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Frequentemente restrita ou dependente de nuvem
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Servidor Relay Próprio (Self-Hosted)</strong></td>
+                <td class="col-eyeslive">
+                  <span class="cell-status good">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Incluso no próprio executável (--relay)
+                  </span>
+                </td>
+                <td>
+                  <span class="cell-status bad">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Indisponível ou exclusivo para planos Enterprise
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Peso e Instalação</strong></td>
+                <td class="col-eyeslive">
+                  <span class="cell-status good">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Binário único em Rust (~7.1 MB)
+                  </span>
+                </td>
+                <td>
+                  <span class="cell-status bad">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Instaladores pesados e múltiplos serviços residentes
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="como-funciona">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-eyebrow">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 11 12 14 22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+            <span>Fluxo de Trabalho</span>
+          </div>
+          <h2 class="section-title">Simples para quem recebe e para quem acessa.</h2>
+          <p class="section-desc">
+            O mesmo executável funciona tanto como Host (quem recebe suporte) quanto como Cliente (quem controla remotamente).
+          </p>
+        </div>
+
+        <div class="steps-grid">
+          <!-- Host Steps -->
+          <div class="step-panel">
+            <div class="step-panel-header">
+              <div class="feature-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/>
+                  <line x1="8" y1="21" x2="16" y2="21"/>
+                  <line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+              </div>
+              <div>
+                <h3 style="font-size: 1.12rem; font-weight: 700;">1. Receber Acesso (Computador Host)</h3>
+                <p style="font-size: 0.84rem; color: var(--text-muted);">Para compartilhar sua tela ou receber suporte</p>
+              </div>
+            </div>
+
+            <ol class="step-list">
+              <li class="step-item">
+                <span class="step-num">01</span>
+                <div class="step-content">
+                  <h4>Execute o EyesLive</h4>
+                  <p>Abra o arquivo <code>eyeslive.exe</code> diretamente em modo portátil ou instale-o com 1 clique.</p>
+                </div>
+              </li>
+              <li class="step-item">
+                <span class="step-num">02</span>
+                <div class="step-content">
+                  <h4>Compartilhe seu ID ou IP</h4>
+                  <p>Envie o seu <strong>EyesLive ID</strong> de 9 dígitos (ex: <code>462-152-868</code>) ou seu IP local exibido no painel esquerdo.</p>
+                </div>
+              </li>
+              <li class="step-item">
+                <span class="step-num">03</span>
+                <div class="step-content">
+                  <h4>Autorize na Tela ou Configure um PIN</h4>
+                  <p>Aprove a conexão escolhendo entre controle completo ou apenas visualização — ou defina um PIN fixo para acesso autônomo.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <!-- Client Steps -->
+          <div class="step-panel">
+            <div class="step-panel-header">
+              <div class="feature-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 3h6v6"/>
+                  <path d="M10 14 21 3"/>
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                </svg>
+              </div>
+              <div>
+                <h3 style="font-size: 1.12rem; font-weight: 700;">2. Acessar Outro PC (Computador Cliente)</h3>
+                <p style="font-size: 0.84rem; color: var(--text-muted);">Para controlar estações remotas em abas</p>
+              </div>
+            </div>
+
+            <ol class="step-list">
+              <li class="step-item">
+                <span class="step-num">01</span>
+                <div class="step-content">
+                  <h4>Informe o Destino</h4>
+                  <p>No painel <strong>Nova Conexão</strong>, digite o EyesLive ID de 9 dígitos ou o endereço <code>IP:Porta</code> da máquina remota.</p>
+                </div>
+              </li>
+              <li class="step-item">
+                <span class="step-num">02</span>
+                <div class="step-content">
+                  <h4>Autentique via PIN ou Solicitação</h4>
+                  <p>Insira o PIN de segurança (caso configurado) ou aguarde a autorização instantânea na tela remota.</p>
+                </div>
+              </li>
+              <li class="step-item">
+                <span class="step-num">03</span>
+                <div class="step-content">
+                  <h4>Controle Sem Interrupções</h4>
+                  <p>Gerencie uma ou mais máquinas simultaneamente em abas, ajuste a qualidade da transmissão e transfira arquivos.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- CLI & Automation Cards -->
+        <div style="margin-top: 28px;">
+          <div class="cli-grid">
+            <div class="cli-card">
+              <div>
+                <h4>Instalação Silenciosa + Segundo Plano</h4>
+                <p>Ideal para implantar rapidamente em estações de trabalho e iniciar na Bandeja do Sistema.</p>
+              </div>
+              <div class="code-block">
+                <code>eyeslive.exe --install --background</code>
+                <button type="button" class="copy-cmd-btn" data-copy="eyeslive.exe --install --background" title="Copiar comando" aria-label="Copiar comando">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="cli-card">
+              <div>
+                <h4>Servidor Relay Privado Próprio</h4>
+                <p>Execute seu próprio servidor Relay corporativo ou em VPS privada usando o mesmo executável.</p>
+              </div>
+              <div class="code-block">
+                <code>eyeslive.exe --relay 0.0.0.0:9091</code>
+                <button type="button" class="copy-cmd-btn" data-copy="eyeslive.exe --relay 0.0.0.0:9091" title="Copiar comando" aria-label="Copiar comando">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="cli-card">
+              <div>
+                <h4>Compilar do Código-Fonte (Rust)</h4>
+                <p>Código 100% auditável. Compile seu próprio binário otimizado com o Cargo.</p>
+              </div>
+              <div class="code-block">
+                <code>cargo build --release</code>
+                <button type="button" class="copy-cmd-btn" data-copy="git clone https://github.com/gabrielyandev/eyeslive.git && cd eyeslive && cargo build --release" title="Copiar comando" aria-label="Copiar comando">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download">
+      <div class="container">
+        <div class="download-box">
+          <div>
+            <div class="section-eyebrow">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Download Oficial</span>
+            </div>
+            <h2 class="section-title" style="margin-bottom: 12px;">Baixe o EyesLive para Windows</h2>
+            <p class="section-desc" style="margin-bottom: 26px;">
+              Executável único nativo (<code>eyeslive.exe</code>). Utilize imediatamente em modo portátil sem precisar instalar ou instale no sistema em 1 clique. Inclui atualizador automático integrado.
+            </p>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+              <a href="https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe" class="btn btn-primary btn-lg" id="main-download-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Baixar eyeslive.exe (x64)</span>
+              </a>
+
+              <a href="https://github.com/gabrielyandev/eyeslive/releases" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span>Todas as Releases</span>
+              </a>
+            </div>
+
+            <div class="sha-box" title="Hash SHA-256 do executável oficial">
+              <span>SHA-256: <code id="release-sha">3573aaf19302b5dd3a83606c83fc5a83fa57edc2eebfc8b6937f1eafd7220266</code></span>
+              <button type="button" class="copy-cmd-btn" id="copy-sha-btn" data-copy="3573aaf19302b5dd3a83606c83fc5a83fa57edc2eebfc8b6937f1eafd7220266" aria-label="Copiar hash SHA-256">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="download-specs">
+            <div class="spec-row">
+              <span class="spec-key">Versão Atual</span>
+              <span class="spec-val" id="spec-version">EyesLive v1.1.1</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Plataforma</span>
+              <span class="spec-val">Windows 10 / 11 (64-bit)</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Tamanho do Binário</span>
+              <span class="spec-val" id="spec-size">7.16 MB (Executável Único)</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Linguagem / Motor</span>
+              <span class="spec-val">Rust Nativo (egui / Tokio)</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Licença &amp; Uso</span>
+              <span class="spec-val" style="color: var(--emerald-text);">Gratuito • Sem Limites</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Autor</span>
+              <span class="spec-val">Gabriel Yan (@gabrielyandev)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="brand-mark" style="width: 28px; height: 28px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </span>
+        <span>
+          <strong>EyesLive Remote Desktop</strong> — Desenvolvido por <a href="https://github.com/gabrielyandev" target="_blank" rel="noopener noreferrer" style="color: var(--text-primary); font-weight: 600;">Gabriel Yan (@gabrielyandev)</a>
+        </span>
+      </div>
+
+      <div class="footer-links">
+        <a href="https://github.com/gabrielyandev/eyeslive" target="_blank" rel="noopener noreferrer">Repositório GitHub</a>
+        <a href="https://github.com/gabrielyandev/eyeslive/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        <a href="https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe">Download Direto (.exe)</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
