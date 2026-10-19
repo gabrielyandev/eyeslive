@@ -47,23 +47,35 @@ pub async fn run_relay_server(bind_addr: &str) -> anyhow::Result<()> {
                     let maybe_host = hosts.lock().await.remove(&clean_id);
                     if let Some(mut host_stream) = maybe_host {
                         let _ = host_stream.set_nodelay(true);
-                        let _ = send_packet(
-                            &mut stream,
-                            &Packet::RelayStatus {
-                                ok: true,
-                                message: "Connected to host via EyesLive Relay".into(),
-                            },
-                        )
-                        .await;
-                        let _ = send_packet(
+                        if send_packet(
                             &mut host_stream,
                             &Packet::RelayStatus {
                                 ok: true,
                                 message: "Viewer connected via EyesLive Relay".into(),
                             },
                         )
-                        .await;
-                        let _ = copy_bidirectional(&mut stream, &mut host_stream).await;
+                        .await
+                        .is_ok()
+                        {
+                            let _ = send_packet(
+                                &mut stream,
+                                &Packet::RelayStatus {
+                                    ok: true,
+                                    message: "Connected to host via EyesLive Relay".into(),
+                                },
+                            )
+                            .await;
+                            let _ = copy_bidirectional(&mut stream, &mut host_stream).await;
+                        } else {
+                            let _ = send_packet(
+                                &mut stream,
+                                &Packet::RelayStatus {
+                                    ok: false,
+                                    message: format!("Host ID {} disconnected from relay", clean_id),
+                                },
+                            )
+                            .await;
+                        }
                     } else {
                         let _ = send_packet(
                             &mut stream,

@@ -47,7 +47,76 @@ pub struct HostConfig {
     pub active_clients: Arc<Mutex<usize>>,
     pub bound_port: Arc<Mutex<u16>>,
     pub host_status: Arc<Mutex<String>>,
+    pub relay_server: Arc<Mutex<String>>,
+    pub relay_connected: Arc<Mutex<bool>>,
     pub download_dir: PathBuf,
+}
+
+pub async fn start_relay_registration_loop(config: HostConfig) {
+    loop {
+        let relay_addr = config.relay_server.lock().unwrap().trim().to_string();
+        if relay_addr.is_empty() {
+            *config.relay_connected.lock().unwrap() = false;
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            continue;
+        }
+
+        match tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(&relay_addr)).await {
+            Ok(Ok(mut stream)) => {
+                let _ = stream.set_nodelay(true);
+                if send_packet(
+                    &mut stream,
+                    &Packet::RegisterHost {
+                        desk_id: config.desk_id.clone(),
+                    },
+                )
+                .await
+                .is_err()
+                {
+                    *config.relay_connected.lock().unwrap() = false;
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                    continue;
+                }
+
+                // First RelayStatus confirms registration in waiting pool
+                match recv_packet(&mut stream).await {
+                    Ok(Packet::RelayStatus { ok: true, .. }) => {
+                        *config.relay_connected.lock().unwrap() = true;
+                    }
+                    _ => {
+                        *config.relay_connected.lock().unwrap() = false;
+                        tokio::time::sleep(Duration::from_secs(3)).await;
+                        continue;
+                    }
+                }
+
+                // Wait until a Viewer pairs with our ID on the Relay
+                match recv_packet(&mut stream).await {
+                    Ok(Packet::RelayStatus { ok: true, .. }) => {
+                        let cfg = config.clone();
+                        tokio::spawn(async move {
+                            let _ = handle_client_session(
+                                stream,
+                                "Conexao via Relay (ID)".into(),
+                                cfg,
+                            )
+                            .await;
+                        });
+                        // Immediately reconnect to keep ID registered for next viewer!
+                        continue;
+                    }
+                    _ => {
+                        *config.relay_connected.lock().unwrap() = false;
+                        tokio::time::sleep(Duration::from_secs(2)).await;
+                    }
+                }
+            }
+            _ => {
+                *config.relay_connected.lock().unwrap() = false;
+                tokio::time::sleep(Duration::from_secs(4)).await;
+            }
+        }
+    }
 }
 
 pub async fn start_host_listener(base_port: u16, config: HostConfig) -> anyhow::Result<()> {

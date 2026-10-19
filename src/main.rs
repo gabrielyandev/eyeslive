@@ -23,14 +23,16 @@ mod viewer;
 use eframe::egui::{
     self, Align2, Color32, Frame, Id, Margin, Order, RichText, Rounding, Stroke, Vec2,
 };
-use host::{start_host_listener, ConsentDecision, HostConfig, PendingConsent};
+use host::{
+    start_host_listener, start_relay_registration_loop, ConsentDecision, HostConfig, PendingConsent,
+};
 use installer::{
     get_installed_exe_path, install_application, is_autostart_enabled, is_installed, set_autostart,
     uninstall_application,
 };
 use protocol::{
     MouseBtn, Packet, AUTHOR_NAME, AUTHOR_SIGNATURE, DEFAULT_HOST_PORT, DEFAULT_RELAY_PORT,
-    GITHUB_PROFILE_URL, GITHUB_REPO_URL,
+    DEFAULT_RELAY_SERVER, GITHUB_PROFILE_URL, GITHUB_REPO_URL,
 };
 use rand::Rng;
 use std::net::UdpSocket;
@@ -230,6 +232,8 @@ struct EyesLiveApp {
     target_input: String,
     target_pin: String,
     relay_input: String,
+    relay_server: Arc<Mutex<String>>,
+    relay_connected: Arc<Mutex<bool>>,
     use_relay: bool,
 
     // Multi-tab concurrent sessions (0 = Home Workspace, 1..N = Active Remote Sessions)
@@ -250,12 +254,15 @@ impl EyesLiveApp {
         let p3: u32 = rng.gen_range(100..999);
         let my_desk_id = format!("{}-{}-{}", p1, p2, p3);
 
+        let default_relay = DEFAULT_RELAY_SERVER.to_string();
         let allow_control = Arc::new(Mutex::new(true));
         let require_consent = Arc::new(Mutex::new(true));
         let pending_consents = Arc::new(Mutex::new(Vec::new()));
         let active_incoming = Arc::new(Mutex::new(0usize));
         let my_pin = Arc::new(Mutex::new(String::new()));
         let bound_port = Arc::new(Mutex::new(DEFAULT_HOST_PORT));
+        let relay_server = Arc::new(Mutex::new(default_relay.clone()));
+        let relay_connected = Arc::new(Mutex::new(false));
         let host_status = Arc::new(Mutex::new(format!(
             "Inicializando porta {}...",
             DEFAULT_HOST_PORT
@@ -271,11 +278,17 @@ impl EyesLiveApp {
             active_clients: active_incoming.clone(),
             bound_port: bound_port.clone(),
             host_status: host_status.clone(),
+            relay_server: relay_server.clone(),
+            relay_connected: relay_connected.clone(),
             download_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         };
 
+        let host_cfg_relay = host_cfg.clone();
         rt.spawn(async move {
             let _ = start_host_listener(DEFAULT_HOST_PORT, host_cfg).await;
+        });
+        rt.spawn(async move {
+            start_relay_registration_loop(host_cfg_relay).await;
         });
 
         // Background update check on startup
@@ -327,9 +340,11 @@ impl EyesLiveApp {
             } else {
                 None
             },
-            target_input: format!("127.0.0.1:{}", DEFAULT_HOST_PORT),
+            target_input: String::new(),
             target_pin: String::new(),
-            relay_input: format!("127.0.0.1:{}", DEFAULT_RELAY_PORT),
+            relay_input: default_relay,
+            relay_server,
+            relay_connected,
             use_relay: false,
             sessions: Vec::new(),
             active_tab: 0,
@@ -371,10 +386,18 @@ impl EyesLiveApp {
             self.target_input = target.clone();
         }
 
+        let is_id_only = !target.contains('.') && !target.contains(':');
         let id = self.next_session_id;
         self.next_session_id += 1;
-        let relay = if self.use_relay {
-            Some(self.relay_input.trim().to_string())
+        let relay = if self.use_relay || is_id_only {
+            let r = self.relay_input.trim().to_string();
+            let r_addr = if r.contains(':') {
+                r
+            } else {
+                format!("{}:{}", r, DEFAULT_RELAY_PORT)
+            };
+            *self.relay_server.lock().unwrap() = r_addr.clone();
+            Some(r_addr)
         } else {
             None
         };
@@ -757,24 +780,36 @@ impl EyesLiveApp {
             );
 
             ui.add_space(8.0);
-            ui.checkbox(
-                &mut self.use_relay,
-                RichText::new("Roteamento via Servidor Relay por ID").size(12.5),
-            );
-
-            if self.use_relay {
-                ui.add_space(4.0);
+            let relay_ok = *self.relay_connected.lock().unwrap();
+            ui.horizontal_wrapped(|ui| {
+                draw_status_dot(ui, if relay_ok { STATUS_EMERALD } else { STATUS_AMBER });
                 ui.label(
-                    RichText::new("ENDERECO DO SERVIDOR RELAY")
-                        .size(10.5)
-                        .color(TEXT_MUTED)
-                        .monospace(),
+                    RichText::new(if relay_ok {
+                        "SERVIDOR RELAY (ID REGISTRADO E PRONTO PARA ACESSO GLOBAL)"
+                    } else {
+                        "SERVIDOR RELAY PARA ACESSO POR ID (EX: IP_ORACLE_CLOUD:9091)"
+                    })
+                    .size(10.5)
+                    .color(if relay_ok { STATUS_EMERALD } else { TEXT_MUTED })
+                    .monospace(),
                 );
-                ui.add(
+            });
+            if ui
+                .add(
                     egui::TextEdit::singleline(&mut self.relay_input)
                         .desired_width(field_w)
-                        .font(egui::TextStyle::Monospace),
-                );
+                        .font(egui::TextStyle::Monospace)
+                        .hint_text("Ex: 147.15.x.x:9091"),
+                )
+                .changed()
+            {
+                let r = self.relay_input.trim().to_string();
+                let r_addr = if r.is_empty() || r.contains(':') {
+                    r
+                } else {
+                    format!("{}:{}", r, DEFAULT_RELAY_PORT)
+                };
+                *self.relay_server.lock().unwrap() = r_addr;
             }
 
             ui.add_space(14.0);

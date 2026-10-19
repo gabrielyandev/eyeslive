@@ -8,6 +8,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub const DEFAULT_HOST_PORT: u16 = 9090;
 pub const DEFAULT_RELAY_PORT: u16 = 9091;
+pub const DEFAULT_RELAY_SERVER: &str = "147.15.110.234:9091";
 pub const AUTHOR_NAME: &str = "Gabriel Yan";
 pub const AUTHOR_SIGNATURE: &str = "@gabrielyandev";
 pub const GITHUB_PROFILE_URL: &str = "https://github.com/gabrielyandev";
