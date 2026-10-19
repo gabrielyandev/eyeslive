@@ -7,9 +7,9 @@
 //! Features:
 //! - Zero account login & Zero session time limits
 //! - Interactive Access Consent Modal on Host (Full Control / View-Only / Reject)
-//! - Native System Installer, Windows Autostart & Background Execution Mode
+//! - Native System Installer, Windows Autostart & System Tray Background Mode
 //! - Multi-tab simultaneous connections to multiple machines
-//! - Direct IP:Port (LAN/VPN) + Optional Self-Hosted Relay by 9-digit Desk ID
+//! - Direct IP:Port (LAN/VPN) + Integrated Cloud Relay & Optional Private Relay
 //! - Real-time Screen Sharing, Mouse/Keyboard Injection, Clipboard Sync, File Transfer & Auto-Updater
 
 mod host;
@@ -46,19 +46,85 @@ use updater::{
 };
 use viewer::RemoteSession;
 
-// Modern Dark Palette Constants
-const BG_BASE: Color32 = Color32::from_rgb(9, 13, 22);
-const BG_PANEL: Color32 = Color32::from_rgb(13, 19, 31);
-const BG_CARD: Color32 = Color32::from_rgb(17, 24, 39);
-const BG_INPUT: Color32 = Color32::from_rgb(24, 34, 53);
-const BORDER_SUBTLE: Color32 = Color32::from_rgb(38, 52, 77);
-const ACCENT_BLUE: Color32 = Color32::from_rgb(59, 130, 246);
-const ACCENT_CYAN: Color32 = Color32::from_rgb(56, 189, 248);
-const STATUS_EMERALD: Color32 = Color32::from_rgb(16, 185, 129);
-const STATUS_AMBER: Color32 = Color32::from_rgb(245, 158, 11);
-const STATUS_RED: Color32 = Color32::from_rgb(239, 68, 68);
-const TEXT_PRIMARY: Color32 = Color32::from_rgb(241, 245, 249);
-const TEXT_MUTED: Color32 = Color32::from_rgb(148, 163, 184);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UiThemeMode {
+    DarkSlate,
+    CleanLight,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ThemePalette {
+    bg_base: Color32,
+    bg_panel: Color32,
+    bg_card: Color32,
+    bg_elevated: Color32,
+    bg_input: Color32,
+    bg_button: Color32,
+    bg_button_hover: Color32,
+    border_subtle: Color32,
+    border_strong: Color32,
+    text_primary: Color32,
+    text_secondary: Color32,
+    text_muted: Color32,
+    accent_primary: Color32,
+    accent_bright: Color32,
+    status_emerald: Color32,
+    status_emerald_text: Color32,
+    status_amber: Color32,
+    status_red: Color32,
+    status_red_text: Color32,
+}
+
+impl ThemePalette {
+    fn for_mode(mode: UiThemeMode) -> Self {
+        match mode {
+            UiThemeMode::DarkSlate => Self {
+                // Soft, elevated slate-graphite palette with high WCAG contrast (never pitch-black)
+                bg_base: Color32::from_rgb(24, 28, 37),
+                bg_panel: Color32::from_rgb(31, 37, 49),
+                bg_card: Color32::from_rgb(37, 44, 58),
+                bg_elevated: Color32::from_rgb(46, 55, 72),
+                bg_input: Color32::from_rgb(20, 24, 33),
+                bg_button: Color32::from_rgb(52, 62, 82),
+                bg_button_hover: Color32::from_rgb(66, 79, 104),
+                border_subtle: Color32::from_rgb(64, 76, 99),
+                border_strong: Color32::from_rgb(88, 104, 134),
+                text_primary: Color32::from_rgb(248, 250, 252),
+                text_secondary: Color32::from_rgb(219, 228, 240),
+                text_muted: Color32::from_rgb(172, 186, 206),
+                accent_primary: Color32::from_rgb(59, 130, 246),
+                accent_bright: Color32::from_rgb(96, 175, 255),
+                status_emerald: Color32::from_rgb(16, 185, 129),
+                status_emerald_text: Color32::from_rgb(52, 211, 153),
+                status_amber: Color32::from_rgb(251, 191, 36),
+                status_red: Color32::from_rgb(220, 53, 69),
+                status_red_text: Color32::from_rgb(248, 113, 113),
+            },
+            UiThemeMode::CleanLight => Self {
+                // Crisp, modern desktop light palette
+                bg_base: Color32::from_rgb(241, 245, 249),
+                bg_panel: Color32::from_rgb(255, 255, 255),
+                bg_card: Color32::from_rgb(255, 255, 255),
+                bg_elevated: Color32::from_rgb(248, 250, 252),
+                bg_input: Color32::from_rgb(255, 255, 255),
+                bg_button: Color32::from_rgb(236, 242, 249),
+                bg_button_hover: Color32::from_rgb(220, 230, 242),
+                border_subtle: Color32::from_rgb(203, 213, 225),
+                border_strong: Color32::from_rgb(148, 163, 184),
+                text_primary: Color32::from_rgb(15, 23, 42),
+                text_secondary: Color32::from_rgb(51, 65, 85),
+                text_muted: Color32::from_rgb(100, 116, 139),
+                accent_primary: Color32::from_rgb(37, 99, 235),
+                accent_bright: Color32::from_rgb(2, 132, 199),
+                status_emerald: Color32::from_rgb(5, 150, 105),
+                status_emerald_text: Color32::from_rgb(4, 120, 87),
+                status_amber: Color32::from_rgb(217, 119, 6),
+                status_red: Color32::from_rgb(220, 38, 38),
+                status_red_text: Color32::from_rgb(185, 28, 28),
+            },
+        }
+    }
+}
 
 fn detect_local_ip() -> String {
     if let Ok(sock) = UdpSocket::bind("0.0.0.0:0") {
@@ -86,65 +152,113 @@ fn open_browser_url(url: &str) {
     }
 }
 
-fn configure_modern_theme(ctx: &egui::Context) {
-    let mut style = (*ctx.style()).clone();
-    style.spacing.item_spacing = Vec2::new(8.0, 8.0);
-    style.spacing.button_padding = Vec2::new(10.0, 6.0);
-    style.spacing.window_margin = Margin::same(14.0);
+/// Applies the theme palette across ALL egui internal style slots (both Dark and Light)
+/// so Windows OS theme notifications never corrupt widget backgrounds or text contrast.
+fn apply_theme_to_context(ctx: &egui::Context, mode: UiThemeMode) {
+    let p = ThemePalette::for_mode(mode);
 
-    let mut visuals = egui::Visuals::dark();
-    visuals.panel_fill = BG_BASE;
-    visuals.window_fill = BG_CARD;
-    visuals.extreme_bg_color = BG_INPUT;
-    visuals.faint_bg_color = BG_PANEL;
-    visuals.override_text_color = Some(TEXT_PRIMARY);
+    ctx.options_mut(|opt| {
+        opt.theme_preference = match mode {
+            UiThemeMode::DarkSlate => egui::ThemePreference::Dark,
+            UiThemeMode::CleanLight => egui::ThemePreference::Light,
+        };
+    });
 
-    let rounding = Rounding::same(6.0);
-    visuals.widgets.noninteractive.bg_fill = BG_CARD;
-    visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, BORDER_SUBTLE);
-    visuals.widgets.noninteractive.rounding = rounding;
+    ctx.all_styles_mut(|style| {
+        style.spacing.item_spacing = Vec2::new(8.0, 8.0);
+        style.spacing.button_padding = Vec2::new(12.0, 7.0);
+        style.spacing.window_margin = Margin::same(14.0);
+        style.spacing.interact_size = Vec2::new(40.0, 26.0);
 
-    visuals.widgets.inactive.bg_fill = BG_INPUT;
-    visuals.widgets.inactive.weak_bg_fill = BG_INPUT;
-    visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, BORDER_SUBTLE);
-    visuals.widgets.inactive.rounding = rounding;
+        let mut visuals = match mode {
+            UiThemeMode::DarkSlate => egui::Visuals::dark(),
+            UiThemeMode::CleanLight => egui::Visuals::light(),
+        };
 
-    visuals.widgets.hovered.bg_fill = Color32::from_rgb(36, 50, 76);
-    visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(36, 50, 76);
-    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, ACCENT_CYAN);
-    visuals.widgets.hovered.rounding = rounding;
+        visuals.dark_mode = mode == UiThemeMode::DarkSlate;
+        visuals.panel_fill = p.bg_base;
+        visuals.window_fill = p.bg_card;
+        visuals.extreme_bg_color = p.bg_input;
+        visuals.faint_bg_color = p.bg_elevated;
+        visuals.code_bg_color = p.bg_input;
+        visuals.override_text_color = Some(p.text_primary);
 
-    visuals.widgets.active.bg_fill = ACCENT_BLUE;
-    visuals.widgets.active.weak_bg_fill = ACCENT_BLUE;
-    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, ACCENT_CYAN);
-    visuals.widgets.active.rounding = rounding;
+        let rounding = Rounding::same(6.0);
 
-    visuals.selection.bg_fill = ACCENT_BLUE;
-    visuals.selection.stroke = Stroke::new(1.0_f32, Color32::WHITE);
+        visuals.widgets.noninteractive.bg_fill = p.bg_card;
+        visuals.widgets.noninteractive.weak_bg_fill = p.bg_card;
+        visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, p.border_subtle);
+        visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.2_f32, p.text_primary);
+        visuals.widgets.noninteractive.rounding = rounding;
 
-    style.visuals = visuals;
-    ctx.set_style(style);
+        visuals.widgets.inactive.bg_fill = p.bg_button;
+        visuals.widgets.inactive.weak_bg_fill = p.bg_button;
+        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, p.border_strong);
+        visuals.widgets.inactive.fg_stroke = Stroke::new(1.3_f32, p.text_primary);
+        visuals.widgets.inactive.rounding = rounding;
+
+        visuals.widgets.hovered.bg_fill = p.bg_button_hover;
+        visuals.widgets.hovered.weak_bg_fill = p.bg_button_hover;
+        visuals.widgets.hovered.bg_stroke = Stroke::new(1.2_f32, p.accent_bright);
+        visuals.widgets.hovered.fg_stroke = Stroke::new(1.5_f32, p.text_primary);
+        visuals.widgets.hovered.rounding = rounding;
+
+        visuals.widgets.active.bg_fill = p.accent_primary;
+        visuals.widgets.active.weak_bg_fill = p.accent_primary;
+        visuals.widgets.active.bg_stroke = Stroke::new(1.2_f32, p.accent_bright);
+        visuals.widgets.active.fg_stroke = Stroke::new(1.5_f32, Color32::WHITE);
+        visuals.widgets.active.rounding = rounding;
+
+        visuals.widgets.open.bg_fill = p.bg_elevated;
+        visuals.widgets.open.weak_bg_fill = p.bg_elevated;
+        visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, p.accent_bright);
+        visuals.widgets.open.fg_stroke = Stroke::new(1.3_f32, p.text_primary);
+        visuals.widgets.open.rounding = rounding;
+
+        visuals.selection.bg_fill = p.accent_primary;
+        visuals.selection.stroke = Stroke::new(1.5_f32, Color32::WHITE);
+
+        style.visuals = visuals;
+    });
 }
 
-fn card_frame() -> Frame {
+fn card_frame(p: &ThemePalette) -> Frame {
     Frame::none()
-        .fill(BG_CARD)
-        .stroke(Stroke::new(1.0_f32, BORDER_SUBTLE))
+        .fill(p.bg_card)
+        .stroke(Stroke::new(1.0_f32, p.border_subtle))
         .rounding(Rounding::same(10.0))
-        .inner_margin(Margin::same(16.0))
+        .inner_margin(Margin::same(18.0))
 }
 
 fn pill_frame(fill: Color32, border: Color32) -> Frame {
     Frame::none()
         .fill(fill)
         .stroke(Stroke::new(1.0_f32, border))
-        .rounding(Rounding::same(6.0))
-        .inner_margin(Margin::symmetric(10.0, 6.0))
+        .rounding(Rounding::same(8.0))
+        .inner_margin(Margin::symmetric(12.0, 8.0))
 }
 
 fn draw_status_dot(ui: &mut egui::Ui, color: Color32) {
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(8.0, 8.0), egui::Sense::hover());
-    ui.painter().circle_filled(rect.center(), 4.0, color);
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(9.0, 9.0), egui::Sense::hover());
+    ui.painter().circle_filled(rect.center(), 4.5, color);
+}
+
+fn styled_button<'a>(
+    label: &str,
+    text_size: f32,
+    text_color: Color32,
+    fill_color: Color32,
+    border_color: Color32,
+) -> egui::Button<'a> {
+    egui::Button::new(
+        RichText::new(label)
+            .size(text_size)
+            .strong()
+            .color(text_color),
+    )
+    .fill(fill_color)
+    .stroke(Stroke::new(1.0_f32, border_color))
+    .rounding(Rounding::same(6.0))
 }
 
 fn main() -> eframe::Result<()> {
@@ -201,14 +315,16 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(move |cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            configure_modern_theme(&cc.egui_ctx);
-            Ok(Box::new(EyesLiveApp::new(rt, start_in_background)))
+            let default_mode = UiThemeMode::DarkSlate;
+            apply_theme_to_context(&cc.egui_ctx, default_mode);
+            Ok(Box::new(EyesLiveApp::new(rt, start_in_background, default_mode)))
         }),
     )
 }
 
 struct EyesLiveApp {
     rt: tokio::runtime::Runtime,
+    theme_mode: UiThemeMode,
     my_desk_id: String,
     local_ip: String,
     my_pin: Arc<Mutex<String>>,
@@ -226,15 +342,15 @@ struct EyesLiveApp {
     keep_in_background: bool,
     pending_initial_hide: bool,
     force_quit: bool,
-    install_feedback: Option<(String, Color32)>,
+    install_feedback: Option<(String, bool)>,
 
-    // Connection form
+    // Connection form (Built-in relay is used transparently; custom relay is optional & hidden by default)
     target_input: String,
     target_pin: String,
-    relay_input: String,
+    use_custom_relay: bool,
+    custom_relay_input: String,
     relay_server: Arc<Mutex<String>>,
     relay_connected: Arc<Mutex<bool>>,
-    use_relay: bool,
 
     // Multi-tab concurrent sessions (0 = Home Workspace, 1..N = Active Remote Sessions)
     sessions: Vec<RemoteSession>,
@@ -247,7 +363,11 @@ struct EyesLiveApp {
 }
 
 impl EyesLiveApp {
-    fn new(rt: tokio::runtime::Runtime, started_in_background: bool) -> Self {
+    fn new(
+        rt: tokio::runtime::Runtime,
+        started_in_background: bool,
+        theme_mode: UiThemeMode,
+    ) -> Self {
         let mut rng = rand::thread_rng();
         let p1: u32 = rng.gen_range(100..999);
         let p2: u32 = rng.gen_range(100..999);
@@ -261,7 +381,7 @@ impl EyesLiveApp {
         let active_incoming = Arc::new(Mutex::new(0usize));
         let my_pin = Arc::new(Mutex::new(String::new()));
         let bound_port = Arc::new(Mutex::new(DEFAULT_HOST_PORT));
-        let relay_server = Arc::new(Mutex::new(default_relay.clone()));
+        let relay_server = Arc::new(Mutex::new(default_relay));
         let relay_connected = Arc::new(Mutex::new(false));
         let host_status = Arc::new(Mutex::new(format!(
             "Inicializando porta {}...",
@@ -317,6 +437,7 @@ impl EyesLiveApp {
 
         Self {
             rt,
+            theme_mode,
             my_desk_id,
             local_ip: detect_local_ip(),
             my_pin,
@@ -335,23 +456,39 @@ impl EyesLiveApp {
             install_feedback: if started_in_background {
                 Some((
                     "Iniciado na Bandeja do Sistema (Host ativo em segundo plano).".into(),
-                    STATUS_EMERALD,
+                    true,
                 ))
             } else {
                 None
             },
             target_input: String::new(),
             target_pin: String::new(),
-            relay_input: default_relay,
+            use_custom_relay: false,
+            custom_relay_input: String::new(),
             relay_server,
             relay_connected,
-            use_relay: false,
             sessions: Vec::new(),
             active_tab: 0,
             next_session_id: 1,
             update_status,
             show_update_banner: true,
         }
+    }
+
+    fn sync_effective_relay(&mut self) {
+        let effective = if self.use_custom_relay {
+            let trimmed = self.custom_relay_input.trim();
+            if trimmed.is_empty() {
+                DEFAULT_RELAY_SERVER.to_string()
+            } else if trimmed.contains(':') {
+                trimmed.to_string()
+            } else {
+                format!("{}:{}", trimmed, DEFAULT_RELAY_PORT)
+            }
+        } else {
+            DEFAULT_RELAY_SERVER.to_string()
+        };
+        *self.relay_server.lock().unwrap() = effective;
     }
 
     fn trigger_manual_update_check(&self) {
@@ -386,21 +523,17 @@ impl EyesLiveApp {
             self.target_input = target.clone();
         }
 
+        self.sync_effective_relay();
         let is_id_only = !target.contains('.') && !target.contains(':');
         let id = self.next_session_id;
         self.next_session_id += 1;
-        let relay = if self.use_relay || is_id_only {
-            let r = self.relay_input.trim().to_string();
-            let r_addr = if r.contains(':') {
-                r
-            } else {
-                format!("{}:{}", r, DEFAULT_RELAY_PORT)
-            };
-            *self.relay_server.lock().unwrap() = r_addr.clone();
-            Some(r_addr)
+
+        let relay = if is_id_only || self.use_custom_relay {
+            Some(self.relay_server.lock().unwrap().clone())
         } else {
             None
         };
+
         let pin = if self.target_pin.trim().is_empty() {
             None
         } else {
@@ -413,7 +546,7 @@ impl EyesLiveApp {
         self.active_tab = id;
     }
 
-    fn render_consent_modal(&mut self, ctx: &egui::Context) {
+    fn render_consent_modal(&mut self, ctx: &egui::Context, p: &ThemePalette) {
         let mut guard = self.pending_consents.lock().unwrap();
         guard.retain(|req| req.requested_at.elapsed() < Duration::from_secs(60));
         let count = guard.len();
@@ -438,7 +571,7 @@ impl EyesLiveApp {
                 ui.painter().rect_filled(
                     screen_rect,
                     Rounding::ZERO,
-                    Color32::from_black_alpha(185),
+                    Color32::from_black_alpha(180),
                 );
             });
 
@@ -446,9 +579,9 @@ impl EyesLiveApp {
 
         if let Some(req) = guard.first() {
             let remaining_secs = 60u64.saturating_sub(req.requested_at.elapsed().as_secs());
-            let modal_w = (screen_rect.width() - 40.0).clamp(300.0, 480.0);
+            let modal_w = (screen_rect.width() - 40.0).clamp(320.0, 500.0);
 
-            egui::Window::new("SOLICITACAO DE ACESSO REMOTO")
+            egui::Window::new("SOLICITAÇÃO DE ACESSO REMOTO")
                 .order(Order::Tooltip)
                 .collapsible(false)
                 .resizable(false)
@@ -457,79 +590,77 @@ impl EyesLiveApp {
                 .max_width(modal_w)
                 .frame(
                     Frame::none()
-                        .fill(BG_CARD)
-                        .stroke(Stroke::new(2.0_f32, ACCENT_BLUE))
+                        .fill(p.bg_card)
+                        .stroke(Stroke::new(2.0_f32, p.accent_primary))
                         .rounding(Rounding::same(12.0))
-                        .inner_margin(Margin::same(20.0)),
+                        .inner_margin(Margin::same(22.0)),
                 )
                 .show(ctx, |ui| {
-                    ui.set_width(modal_w - 40.0);
+                    ui.set_width(modal_w - 44.0);
                     ui.horizontal_wrapped(|ui| {
-                        draw_status_dot(ui, STATUS_AMBER);
+                        draw_status_dot(ui, p.status_amber);
                         ui.label(
-                            RichText::new("AUTORIZACAO DE SEGURANCA NECESSARIA")
-                                .size(12.0)
+                            RichText::new("AUTORIZAÇÃO DE SEGURANÇA NECESSÁRIA")
+                                .size(13.0)
                                 .strong()
-                                .color(STATUS_AMBER)
-                                .monospace(),
+                                .color(p.status_amber),
                         );
                     });
                     ui.add_space(6.0);
                     ui.label(
                         RichText::new(
-                            "Um dispositivo remoto esta solicitando permissao para acessar este computador:",
+                            "Um dispositivo remoto está solicitando permissão para acessar este computador:",
                         )
-                        .size(13.0)
-                        .color(TEXT_PRIMARY),
+                        .size(13.5)
+                        .color(p.text_primary),
                     );
 
                     ui.add_space(10.0);
-                    pill_frame(BG_PANEL, BORDER_SUBTLE).show(ui, |ui| {
+                    pill_frame(p.bg_elevated, p.border_subtle).show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.vertical(|ui| {
                             ui.horizontal_wrapped(|ui| {
                                 ui.label(
-                                    RichText::new("CLIENTE:")
-                                        .size(11.0)
-                                        .color(TEXT_MUTED)
-                                        .monospace(),
+                                    RichText::new("DISPOSITIVO:")
+                                        .size(12.0)
+                                        .strong()
+                                        .color(p.text_muted),
                                 );
                                 ui.label(
                                     RichText::new(&req.client_name)
-                                        .size(13.5)
+                                        .size(14.0)
                                         .strong()
-                                        .color(TEXT_PRIMARY)
+                                        .color(p.text_primary)
                                         .monospace(),
                                 );
                             });
                             ui.horizontal_wrapped(|ui| {
                                 ui.label(
-                                    RichText::new("ENDERECO IP:")
-                                        .size(11.0)
-                                        .color(TEXT_MUTED)
-                                        .monospace(),
+                                    RichText::new("ORIGEM:")
+                                        .size(12.0)
+                                        .strong()
+                                        .color(p.text_muted),
                                 );
                                 ui.label(
                                     RichText::new(&req.peer_addr)
-                                        .size(13.0)
+                                        .size(13.5)
                                         .strong()
-                                        .color(ACCENT_CYAN)
+                                        .color(p.accent_bright)
                                         .monospace(),
                                 );
                             });
                             ui.horizontal_wrapped(|ui| {
                                 ui.label(
-                                    RichText::new("EXPIRA EM:")
-                                        .size(11.0)
-                                        .color(TEXT_MUTED)
-                                        .monospace(),
+                                    RichText::new("TEMPO RESTANTE:")
+                                        .size(12.0)
+                                        .strong()
+                                        .color(p.text_muted),
                                 );
                                 ui.label(
                                     RichText::new(format!("{} segundos", remaining_secs))
-                                        .size(12.0)
+                                        .size(13.0)
                                         .strong()
-                                        .color(STATUS_AMBER)
-                                        .monospace(),
+                                        .color(p.status_amber),
                                 );
                             });
                         });
@@ -538,14 +669,14 @@ impl EyesLiveApp {
                     ui.add_space(14.0);
 
                     let w = ui.available_width();
-                    let full_btn = egui::Button::new(
-                        RichText::new("PERMITIR ACESSO COMPLETO (TELA + CONTROLE)")
-                            .size(12.0)
-                            .strong()
-                            .color(Color32::WHITE),
+                    let full_btn = styled_button(
+                        "PERMITIR ACESSO COMPLETO (TELA + CONTROLE)",
+                        12.5,
+                        Color32::WHITE,
+                        p.status_emerald,
+                        p.status_emerald,
                     )
-                    .fill(STATUS_EMERALD)
-                    .min_size(Vec2::new(w, 36.0));
+                    .min_size(Vec2::new(w, 38.0));
 
                     if ui.add(full_btn).clicked() {
                         resolved_index = Some((0, ConsentDecision::AllowFullControl));
@@ -553,14 +684,14 @@ impl EyesLiveApp {
 
                     ui.add_space(6.0);
 
-                    let view_btn = egui::Button::new(
-                        RichText::new("PERMITIR SOMENTE VISUALIZACAO")
-                            .size(12.0)
-                            .strong()
-                            .color(Color32::WHITE),
+                    let view_btn = styled_button(
+                        "PERMITIR SOMENTE VISUALIZAÇÃO",
+                        12.5,
+                        Color32::WHITE,
+                        p.accent_primary,
+                        p.accent_primary,
                     )
-                    .fill(ACCENT_BLUE)
-                    .min_size(Vec2::new(w, 34.0));
+                    .min_size(Vec2::new(w, 36.0));
 
                     if ui.add(view_btn).clicked() {
                         resolved_index = Some((0, ConsentDecision::AllowViewOnly));
@@ -568,14 +699,14 @@ impl EyesLiveApp {
 
                     ui.add_space(6.0);
 
-                    let reject_btn = egui::Button::new(
-                        RichText::new("RECUSAR CONEXAO")
-                            .size(12.0)
-                            .strong()
-                            .color(Color32::WHITE),
+                    let reject_btn = styled_button(
+                        "RECUSAR CONEXÃO",
+                        12.5,
+                        Color32::WHITE,
+                        p.status_red,
+                        p.status_red,
                     )
-                    .fill(STATUS_RED)
-                    .min_size(Vec2::new(w, 34.0));
+                    .min_size(Vec2::new(w, 36.0));
 
                     if ui.add(reject_btn).clicked() {
                         resolved_index = Some((0, ConsentDecision::Reject));
@@ -594,53 +725,82 @@ impl EyesLiveApp {
         }
     }
 
-    fn render_host_card(&mut self, ui: &mut egui::Ui, lan_endpoint: &str) {
-        card_frame().show(ui, |ui| {
+    fn render_host_card(&mut self, ui: &mut egui::Ui, lan_endpoint: &str, p: &ThemePalette) {
+        card_frame(p).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
-                draw_status_dot(ui, STATUS_EMERALD);
+                draw_status_dot(ui, p.status_emerald);
                 ui.label(
-                    RichText::new("ESTE DISPOSITIVO  //  SERVIDOR HOST")
-                        .size(12.0)
+                    RichText::new("ESTE DISPOSITIVO  •  RECEBER ACESSO (HOST)")
+                        .size(13.0)
                         .strong()
-                        .color(ACCENT_CYAN)
-                        .monospace(),
+                        .color(p.accent_bright),
                 );
             });
             ui.add_space(4.0);
             ui.label(
                 RichText::new(
-                    "Compartilhe seu ID ou IP direto para receber conexoes remotas sem limite de tempo.",
+                    "Compartilhe seu EyesLive ID ou IP direto para permitir conexões remotas sem limite de tempo.",
                 )
-                .size(12.5)
-                .color(TEXT_MUTED),
+                .size(13.5)
+                .color(p.text_secondary),
             );
             ui.add_space(12.0);
 
             // Desk ID Box
-            pill_frame(BG_PANEL, BORDER_SUBTLE).show(ui, |ui| {
+            let relay_ok = *self.relay_connected.lock().unwrap();
+            pill_frame(p.bg_elevated, p.border_subtle).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(
-                            RichText::new("EYESLIVE ID")
-                                .size(10.5)
-                                .color(TEXT_MUTED)
-                                .monospace(),
-                        );
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(
+                                RichText::new("SEU EYESLIVE ID")
+                                    .size(11.5)
+                                    .strong()
+                                    .color(p.text_muted),
+                            );
+                            draw_status_dot(
+                                ui,
+                                if relay_ok {
+                                    p.status_emerald
+                                } else {
+                                    p.status_amber
+                                },
+                            );
+                            ui.label(
+                                RichText::new(if relay_ok {
+                                    "Online para acesso externo"
+                                } else {
+                                    "Sincronizando rede..."
+                                })
+                                .size(11.5)
+                                .strong()
+                                .color(if relay_ok {
+                                    p.status_emerald_text
+                                } else {
+                                    p.status_amber
+                                }),
+                            );
+                        });
+                        ui.add_space(2.0);
                         ui.label(
                             RichText::new(&self.my_desk_id)
-                                .size(24.0)
+                                .size(26.0)
                                 .strong()
-                                .color(TEXT_PRIMARY)
+                                .color(p.text_primary)
                                 .monospace(),
                         );
                     });
-                    ui.add_space(8.0);
-                    if ui
-                        .button(RichText::new("COPIAR ID").size(11.0).monospace())
-                        .clicked()
-                    {
+                    ui.add_space(10.0);
+                    let copy_id_btn = styled_button(
+                        "COPIAR ID",
+                        12.0,
+                        p.text_primary,
+                        p.bg_button,
+                        p.border_strong,
+                    );
+                    if ui.add(copy_id_btn).clicked() {
                         if let Ok(mut cb) = arboard::Clipboard::new() {
                             let _ = cb.set_text(self.my_desk_id.clone());
                         }
@@ -648,32 +808,37 @@ impl EyesLiveApp {
                 });
             });
 
-            ui.add_space(8.0);
+            ui.add_space(10.0);
 
             // LAN Endpoint Box
-            pill_frame(BG_PANEL, BORDER_SUBTLE).show(ui, |ui| {
+            pill_frame(p.bg_elevated, p.border_subtle).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal_wrapped(|ui| {
                     ui.vertical(|ui| {
                         ui.label(
-                            RichText::new("ENDERECO DIRETO (LAN / VPN / TAILSCALE)")
-                                .size(10.5)
-                                .color(TEXT_MUTED)
-                                .monospace(),
+                            RichText::new("ENDEREÇO DIRETO (REDE LOCAL / VPN / TAILSCALE)")
+                                .size(11.5)
+                                .strong()
+                                .color(p.text_muted),
                         );
+                        ui.add_space(2.0);
                         ui.label(
                             RichText::new(lan_endpoint)
-                                .size(16.5)
+                                .size(18.0)
                                 .strong()
-                                .color(ACCENT_CYAN)
+                                .color(p.accent_bright)
                                 .monospace(),
                         );
                     });
-                    ui.add_space(8.0);
-                    if ui
-                        .button(RichText::new("COPIAR IP").size(11.0).monospace())
-                        .clicked()
-                    {
+                    ui.add_space(10.0);
+                    let copy_ip_btn = styled_button(
+                        "COPIAR IP",
+                        12.0,
+                        p.text_primary,
+                        p.bg_button,
+                        p.border_strong,
+                    );
+                    if ui.add(copy_ip_btn).clicked() {
                         if let Ok(mut cb) = arboard::Clipboard::new() {
                             let _ = cb.set_text(lan_endpoint.to_string());
                         }
@@ -681,7 +846,7 @@ impl EyesLiveApp {
                 });
             });
 
-            ui.add_space(10.0);
+            ui.add_space(12.0);
             ui.separator();
             ui.add_space(6.0);
 
@@ -689,9 +854,10 @@ impl EyesLiveApp {
             if ui
                 .checkbox(
                     &mut req_consent,
-                    RichText::new("Solicitar autorizacao na tela ao receber conexao")
-                        .size(12.5)
-                        .strong(),
+                    RichText::new("Solicitar autorização na tela ao receber conexão")
+                        .size(13.5)
+                        .strong()
+                        .color(p.text_primary),
                 )
                 .changed()
             {
@@ -702,125 +868,139 @@ impl EyesLiveApp {
             if ui
                 .checkbox(
                     &mut allow,
-                    RichText::new("Permitir controle remoto de mouse e teclado").size(12.5),
+                    RichText::new("Permitir controle remoto de mouse e teclado")
+                        .size(13.5)
+                        .color(p.text_primary),
                 )
                 .changed()
             {
                 *self.allow_control.lock().unwrap() = allow;
             }
 
-            ui.add_space(4.0);
+            ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
                 ui.label(
-                    RichText::new("PIN de Seguranca (opcional):")
-                        .size(12.5)
-                        .color(TEXT_MUTED),
+                    RichText::new("PIN de Segurança (opcional):")
+                        .size(13.0)
+                        .strong()
+                        .color(p.text_secondary),
                 );
                 let mut pin_guard = self.my_pin.lock().unwrap();
                 ui.add(
                     egui::TextEdit::singleline(&mut *pin_guard)
-                        .desired_width(130.0)
+                        .desired_width(150.0)
+                        .text_color(p.text_primary)
                         .hint_text("Sem PIN"),
                 );
             });
         });
     }
 
-    fn render_client_card(&mut self, ui: &mut egui::Ui) {
-        card_frame().show(ui, |ui| {
+    fn render_client_card(&mut self, ui: &mut egui::Ui, p: &ThemePalette) {
+        card_frame(p).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
-                draw_status_dot(ui, ACCENT_BLUE);
+                draw_status_dot(ui, p.accent_primary);
                 ui.label(
-                    RichText::new("NOVA CONEXAO  //  CLIENTE MULTI-SESSAO")
-                        .size(12.0)
+                    RichText::new("NOVA CONEXÃO  •  ACESSAR OUTRO COMPUTADOR")
+                        .size(13.0)
                         .strong()
-                        .color(ACCENT_CYAN)
-                        .monospace(),
+                        .color(p.accent_bright),
                 );
             });
             ui.add_space(4.0);
             ui.label(
                 RichText::new(
-                    "Conecte-se simultaneamente a multiplas maquinas em abas independentes.",
+                    "Digite o EyesLive ID ou o IP:Porta do computador remoto para iniciar uma sessão em nova aba.",
                 )
-                .size(12.5)
-                .color(TEXT_MUTED),
+                .size(13.5)
+                .color(p.text_secondary),
             );
-            ui.add_space(12.0);
+            ui.add_space(14.0);
 
             let field_w = ui.available_width();
 
             ui.label(
-                RichText::new("DESTINO REMOTO (IP:PORTA OU EYESLIVE ID)")
-                    .size(10.5)
-                    .color(TEXT_MUTED)
-                    .monospace(),
+                RichText::new("DESTINO REMOTO (EYESLIVE ID OU IP:PORTA)")
+                    .size(12.0)
+                    .strong()
+                    .color(p.text_secondary),
             );
-            ui.add(
+            ui.add_space(2.0);
+            let resp_target = ui.add(
                 egui::TextEdit::singleline(&mut self.target_input)
                     .desired_width(field_w)
                     .font(egui::TextStyle::Monospace)
-                    .hint_text("Ex: 192.168.1.50:9090 ou 123-456-789"),
+                    .text_color(p.text_primary)
+                    .margin(Margin::symmetric(10.0, 8.0))
+                    .hint_text("Ex: 462-152-868 ou 192.168.1.50:9090"),
             );
+            if resp_target.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                self.spawn_new_session();
+            }
 
-            ui.add_space(8.0);
+            ui.add_space(10.0);
 
             ui.label(
-                RichText::new("PIN DE AUTENTICACAO (OPCIONAL)")
-                    .size(10.5)
-                    .color(TEXT_MUTED)
-                    .monospace(),
+                RichText::new("PIN DE AUTENTICAÇÃO (OPCIONAL)")
+                    .size(12.0)
+                    .strong()
+                    .color(p.text_secondary),
             );
-            ui.add(
+            ui.add_space(2.0);
+            let resp_pin = ui.add(
                 egui::TextEdit::singleline(&mut self.target_pin)
                     .desired_width(field_w)
                     .password(true)
-                    .hint_text("Deixe vazio se o Host nao exigir PIN"),
+                    .text_color(p.text_primary)
+                    .margin(Margin::symmetric(10.0, 8.0))
+                    .hint_text("Deixe vazio se o computador remoto não exigir PIN"),
             );
+            if resp_pin.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                self.spawn_new_session();
+            }
 
-            ui.add_space(8.0);
-            let relay_ok = *self.relay_connected.lock().unwrap();
-            ui.horizontal_wrapped(|ui| {
-                draw_status_dot(ui, if relay_ok { STATUS_EMERALD } else { STATUS_AMBER });
-                ui.label(
-                    RichText::new(if relay_ok {
-                        "SERVIDOR RELAY (ID REGISTRADO E PRONTO PARA ACESSO GLOBAL)"
-                    } else {
-                        "SERVIDOR RELAY PARA ACESSO POR ID (EX: IP_ORACLE_CLOUD:9091)"
-                    })
-                    .size(10.5)
-                    .color(if relay_ok { STATUS_EMERALD } else { TEXT_MUTED })
-                    .monospace(),
-                );
-            });
+            ui.add_space(10.0);
+
+            // Optional private self-hosted relay toggle (built-in cloud relay is used automatically and never exposes its IP)
             if ui
-                .add(
-                    egui::TextEdit::singleline(&mut self.relay_input)
-                        .desired_width(field_w)
-                        .font(egui::TextStyle::Monospace)
-                        .hint_text("Ex: 147.15.x.x:9091"),
+                .checkbox(
+                    &mut self.use_custom_relay,
+                    RichText::new("Usar servidor Relay privado próprio (avançado)")
+                        .size(13.0)
+                        .color(p.text_secondary),
                 )
                 .changed()
             {
-                let r = self.relay_input.trim().to_string();
-                let r_addr = if r.is_empty() || r.contains(':') {
-                    r
-                } else {
-                    format!("{}:{}", r, DEFAULT_RELAY_PORT)
-                };
-                *self.relay_server.lock().unwrap() = r_addr;
+                self.sync_effective_relay();
             }
 
-            ui.add_space(14.0);
-            let btn = egui::Button::new(
-                RichText::new("INICIAR SESSAO REMOTA")
-                    .size(13.5)
-                    .strong()
-                    .color(Color32::WHITE),
+            if self.use_custom_relay {
+                ui.add_space(4.0);
+                if ui
+                    .add(
+                        egui::TextEdit::singleline(&mut self.custom_relay_input)
+                            .desired_width(field_w)
+                            .font(egui::TextStyle::Monospace)
+                            .text_color(p.text_primary)
+                            .margin(Margin::symmetric(10.0, 8.0))
+                            .hint_text("Ex: relay.suaempresa.com:9091"),
+                    )
+                    .changed()
+                {
+                    self.sync_effective_relay();
+                }
+            }
+
+            ui.add_space(16.0);
+            let btn = styled_button(
+                "CONECTAR E INICIAR SESSÃO REMOTA",
+                14.0,
+                Color32::WHITE,
+                p.accent_primary,
+                p.accent_bright,
             )
-            .fill(ACCENT_BLUE)
-            .min_size(Vec2::new(ui.available_width(), 40.0));
+            .min_size(Vec2::new(ui.available_width(), 42.0));
 
             if ui.add(btn).clicked() {
                 self.spawn_new_session();
@@ -831,6 +1011,10 @@ impl EyesLiveApp {
 
 impl eframe::App for EyesLiveApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Enforce our custom palette on every frame so OS theme changes never corrupt widget colors
+        apply_theme_to_context(ctx, self.theme_mode);
+        let p = ThemePalette::for_mode(self.theme_mode);
+
         if self.pending_initial_hide {
             self.pending_initial_hide = false;
             tray::hide_to_system_tray(ctx);
@@ -860,7 +1044,7 @@ impl eframe::App for EyesLiveApp {
         ctx.request_repaint_after(Duration::from_millis(16));
 
         // Render incoming connection authorization modal if any client is waiting
-        self.render_consent_modal(ctx);
+        self.render_consent_modal(ctx, &p);
 
         // Auto-update banner notification
         let cur_update = self.update_status.lock().unwrap().clone();
@@ -869,36 +1053,34 @@ impl eframe::App for EyesLiveApp {
                 egui::TopBottomPanel::top("update_notification_banner")
                     .frame(
                         Frame::none()
-                            .fill(BG_CARD)
-                            .stroke(Stroke::new(1.0_f32, STATUS_AMBER))
+                            .fill(p.bg_card)
+                            .stroke(Stroke::new(1.0_f32, p.status_amber))
                             .inner_margin(Margin::symmetric(16.0, 8.0)),
                     )
                     .show(ctx, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            draw_status_dot(ui, STATUS_AMBER);
+                            draw_status_dot(ui, p.status_amber);
                             ui.label(
                                 RichText::new(format!(
-                                    "NOVA VERSAO DISPONIVEL: {} (ATUAL: v{})",
+                                    "NOVA VERSÃO DISPONÍVEL: {} (ATUAL: v{})",
                                     info.latest_version, CURRENT_VERSION
                                 ))
-                                .color(STATUS_AMBER)
-                                .size(11.5)
-                                .strong()
-                                .monospace(),
+                                .color(p.status_amber)
+                                .size(12.5)
+                                .strong(),
                             );
 
                             if let Some(exe_url) = info.exe_download_url.clone() {
                                 let status_clone = self.update_status.clone();
                                 let rt_handle = self.rt.handle().clone();
-                                if ui
-                                    .button(
-                                        RichText::new("BAIXAR E ATUALIZAR (.EXE)")
-                                            .color(STATUS_EMERALD)
-                                            .size(11.0)
-                                            .strong(),
-                                    )
-                                    .clicked()
-                                {
+                                let dl_btn = styled_button(
+                                    "BAIXAR E ATUALIZAR (.EXE)",
+                                    12.0,
+                                    Color32::WHITE,
+                                    p.status_emerald,
+                                    p.status_emerald,
+                                );
+                                if ui.add(dl_btn).clicked() {
                                     rt_handle.spawn(async move {
                                         let _ = tokio::task::spawn_blocking(move || {
                                             download_update_sync(&exe_url, status_clone)
@@ -908,14 +1090,25 @@ impl eframe::App for EyesLiveApp {
                                 }
                             }
 
-                            if ui
-                                .button(RichText::new("NOTAS DA VERSAO").size(11.0))
-                                .clicked()
-                            {
+                            let notes_btn = styled_button(
+                                "NOTAS DA VERSÃO",
+                                11.5,
+                                p.text_primary,
+                                p.bg_button,
+                                p.border_strong,
+                            );
+                            if ui.add(notes_btn).clicked() {
                                 open_browser_url(&info.release_url);
                             }
 
-                            if ui.small_button(RichText::new("FECHAR").size(10.5)).clicked() {
+                            let close_btn = styled_button(
+                                "FECHAR",
+                                11.5,
+                                p.text_secondary,
+                                p.bg_button,
+                                p.border_subtle,
+                            );
+                            if ui.add(close_btn).clicked() {
                                 self.show_update_banner = false;
                             }
                         });
@@ -925,8 +1118,8 @@ impl eframe::App for EyesLiveApp {
                 egui::TopBottomPanel::top("download_progress_banner")
                     .frame(
                         Frame::none()
-                            .fill(BG_CARD)
-                            .stroke(Stroke::new(1.0_f32, ACCENT_BLUE))
+                            .fill(p.bg_card)
+                            .stroke(Stroke::new(1.0_f32, p.accent_primary))
                             .inner_margin(Margin::symmetric(16.0, 8.0)),
                     )
                     .show(ctx, |ui| {
@@ -934,12 +1127,12 @@ impl eframe::App for EyesLiveApp {
                             ui.spinner();
                             ui.label(
                                 RichText::new(format!(
-                                    "BAIXANDO ATUALIZACAO: {:.0}%",
+                                    "BAIXANDO ATUALIZAÇÃO: {:.0}%",
                                     progress * 100.0
                                 ))
-                                .size(11.5)
+                                .size(12.5)
                                 .strong()
-                                .monospace(),
+                                .color(p.text_primary),
                             );
                             ui.add(egui::ProgressBar::new(progress).desired_width(180.0));
                         });
@@ -950,29 +1143,27 @@ impl eframe::App for EyesLiveApp {
                 egui::TopBottomPanel::top("ready_restart_banner")
                     .frame(
                         Frame::none()
-                            .fill(BG_CARD)
-                            .stroke(Stroke::new(1.0_f32, STATUS_EMERALD))
+                            .fill(p.bg_card)
+                            .stroke(Stroke::new(1.0_f32, p.status_emerald))
                             .inner_margin(Margin::symmetric(16.0, 8.0)),
                     )
                     .show(ctx, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            draw_status_dot(ui, STATUS_EMERALD);
+                            draw_status_dot(ui, p.status_emerald);
                             ui.label(
-                                RichText::new("ATUALIZACAO PRONTA PARA APLICAR")
-                                    .color(STATUS_EMERALD)
-                                    .size(11.5)
-                                    .strong()
-                                    .monospace(),
+                                RichText::new("ATUALIZAÇÃO PRONTA PARA APLICAR")
+                                    .color(p.status_emerald_text)
+                                    .size(12.5)
+                                    .strong(),
                             );
-                            if ui
-                                .button(
-                                    RichText::new("REINICIAR AGORA")
-                                        .color(Color32::WHITE)
-                                        .size(11.0)
-                                        .strong(),
-                                )
-                                .clicked()
-                            {
+                            let restart_btn = styled_button(
+                                "REINICIAR AGORA",
+                                12.0,
+                                Color32::WHITE,
+                                p.status_emerald,
+                                p.status_emerald,
+                            );
+                            if ui.add(restart_btn).clicked() {
                                 let _ = apply_update_and_restart(&exe_to_run);
                             }
                         });
@@ -981,30 +1172,32 @@ impl eframe::App for EyesLiveApp {
             _ => {}
         }
 
-        // Responsive Top Navigation Header (uses horizontal_wrapped so items never collide)
+        // Responsive Top Navigation Header
         egui::TopBottomPanel::top("top_nav_bar")
             .frame(
                 Frame::none()
-                    .fill(BG_PANEL)
-                    .stroke(Stroke::new(1.0_f32, BORDER_SUBTLE))
-                    .inner_margin(Margin::symmetric(16.0, 10.0)),
+                    .fill(p.bg_panel)
+                    .stroke(Stroke::new(1.0_f32, p.border_subtle))
+                    .inner_margin(Margin::symmetric(18.0, 10.0)),
             )
             .show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    draw_status_dot(ui, ACCENT_BLUE);
+                    draw_status_dot(ui, p.accent_primary);
                     ui.label(
                         RichText::new("EYESLIVE")
-                            .size(17.0)
+                            .size(18.0)
                             .strong()
-                            .color(TEXT_PRIMARY),
+                            .color(p.text_primary),
+                    );
+                    let author_btn = styled_button(
+                        &format!("{} ({})", AUTHOR_NAME, AUTHOR_SIGNATURE),
+                        12.0,
+                        p.accent_bright,
+                        p.bg_elevated,
+                        p.border_subtle,
                     );
                     if ui
-                        .button(
-                            RichText::new(format!("{} ({})", AUTHOR_NAME, AUTHOR_SIGNATURE))
-                                .size(11.5)
-                                .color(ACCENT_CYAN)
-                                .monospace(),
-                        )
+                        .add(author_btn)
                         .on_hover_text(format!("Abrir GitHub: {}", GITHUB_PROFILE_URL))
                         .clicked()
                     {
@@ -1015,20 +1208,26 @@ impl eframe::App for EyesLiveApp {
 
                     // Workspace / Dashboard Tab
                     let home_selected = self.active_tab == 0;
-                    if ui
-                        .selectable_label(
-                            home_selected,
-                            RichText::new("PAINEL PRINCIPAL")
-                                .size(12.0)
-                                .strong()
-                                .color(if home_selected {
-                                    Color32::WHITE
-                                } else {
-                                    TEXT_MUTED
-                                }),
-                        )
-                        .clicked()
-                    {
+                    let home_btn = styled_button(
+                        "PAINEL PRINCIPAL",
+                        12.5,
+                        if home_selected {
+                            Color32::WHITE
+                        } else {
+                            p.text_primary
+                        },
+                        if home_selected {
+                            p.accent_primary
+                        } else {
+                            p.bg_button
+                        },
+                        if home_selected {
+                            p.accent_bright
+                        } else {
+                            p.border_strong
+                        },
+                    );
+                    if ui.add(home_btn).clicked() {
                         self.active_tab = 0;
                     }
 
@@ -1037,7 +1236,7 @@ impl eframe::App for EyesLiveApp {
                     for s in &self.sessions {
                         let st = s.state.lock().unwrap();
                         let is_online = st.connected;
-                        let label = format!("SESSAO #{}: {}", s.id, st.host_name);
+                        let label = format!("SESSÃO #{}: {}", s.id, st.host_name);
                         drop(st);
 
                         let is_active = self.active_tab == s.id;
@@ -1045,23 +1244,43 @@ impl eframe::App for EyesLiveApp {
                             draw_status_dot(
                                 ui,
                                 if is_online {
-                                    STATUS_EMERALD
+                                    p.status_emerald
                                 } else {
-                                    STATUS_AMBER
+                                    p.status_amber
                                 },
                             );
-                            if ui
-                                .selectable_label(
-                                    is_active,
-                                    RichText::new(label).size(11.5).strong(),
-                                )
-                                .clicked()
-                            {
+                            let tab_btn = styled_button(
+                                &label,
+                                12.0,
+                                if is_active {
+                                    Color32::WHITE
+                                } else {
+                                    p.text_primary
+                                },
+                                if is_active {
+                                    p.accent_primary
+                                } else {
+                                    p.bg_button
+                                },
+                                if is_active {
+                                    p.accent_bright
+                                } else {
+                                    p.border_strong
+                                },
+                            );
+                            if ui.add(tab_btn).clicked() {
                                 self.active_tab = s.id;
                             }
+                            let close_tab_btn = styled_button(
+                                "X",
+                                11.5,
+                                Color32::WHITE,
+                                p.status_red,
+                                p.status_red,
+                            );
                             if ui
-                                .small_button(RichText::new("X").size(10.5).color(TEXT_MUTED))
-                                .on_hover_text("Encerrar sessao")
+                                .add(close_tab_btn)
+                                .on_hover_text("Encerrar sessão")
                                 .clicked()
                             {
                                 close_id = Some(s.id);
@@ -1075,16 +1294,42 @@ impl eframe::App for EyesLiveApp {
                             self.active_tab = 0;
                         }
                     }
+
+                    ui.separator();
+
+                    // Theme Switcher (Dark Slate vs Clean Light)
+                    let theme_label = match self.theme_mode {
+                        UiThemeMode::DarkSlate => "TEMA: ESCURO SUAVE (MUDAR P/ CLARO)",
+                        UiThemeMode::CleanLight => "TEMA: CLARO (MUDAR P/ ESCURO)",
+                    };
+                    let theme_btn = styled_button(
+                        theme_label,
+                        11.5,
+                        p.text_primary,
+                        p.bg_button,
+                        p.border_strong,
+                    );
+                    if ui
+                        .add(theme_btn)
+                        .on_hover_text("Alternar entre Modo Escuro Suave e Modo Claro")
+                        .clicked()
+                    {
+                        self.theme_mode = match self.theme_mode {
+                            UiThemeMode::DarkSlate => UiThemeMode::CleanLight,
+                            UiThemeMode::CleanLight => UiThemeMode::DarkSlate,
+                        };
+                        apply_theme_to_context(ctx, self.theme_mode);
+                    }
                 });
             });
 
-        // Responsive Bottom Status Bar (wrapped, zero collision between left and right)
+        // Responsive Bottom Status Bar
         egui::TopBottomPanel::bottom("bottom_status_bar")
             .frame(
                 Frame::none()
-                    .fill(BG_PANEL)
-                    .stroke(Stroke::new(1.0_f32, BORDER_SUBTLE))
-                    .inner_margin(Margin::symmetric(16.0, 8.0)),
+                    .fill(p.bg_panel)
+                    .stroke(Stroke::new(1.0_f32, p.border_subtle))
+                    .inner_margin(Margin::symmetric(18.0, 8.0)),
             )
             .show(ctx, |ui| {
                 ui.horizontal_wrapped(|ui| {
@@ -1092,18 +1337,19 @@ impl eframe::App for EyesLiveApp {
                     let hstatus = self.host_status.lock().unwrap().clone();
                     let port = *self.bound_port.lock().unwrap();
 
-                    draw_status_dot(ui, STATUS_EMERALD);
+                    draw_status_dot(ui, p.status_emerald);
                     ui.label(
                         RichText::new(format!(
-                            "HOST: {} ({}:{})  |  CLIENTES: {}  |  ABAS: {}",
+                            "HOST: {} ({}:{})  |  CLIENTES ATIVOS: {}  |  ABAS: {}",
                             hstatus.to_uppercase(),
                             self.local_ip,
                             port,
                             inc,
                             self.sessions.len()
                         ))
-                        .size(11.0)
-                        .color(TEXT_MUTED)
+                        .size(12.0)
+                        .strong()
+                        .color(p.text_secondary)
                         .monospace(),
                     );
 
@@ -1114,69 +1360,64 @@ impl eframe::App for EyesLiveApp {
                         UpdateStatus::Checking => {
                             ui.spinner();
                             ui.label(
-                                RichText::new("VERIFICANDO ATUALIZACOES...")
-                                    .size(10.5)
-                                    .color(TEXT_MUTED)
-                                    .monospace(),
+                                RichText::new("VERIFICANDO ATUALIZAÇÕES...")
+                                    .size(11.5)
+                                    .color(p.text_secondary),
                             );
                         }
                         UpdateStatus::Available(ref info) => {
-                            if ui
-                                .small_button(
-                                    RichText::new(format!(
-                                        "ATUALIZACAO {} DISPONIVEL",
-                                        info.latest_version
-                                    ))
-                                    .color(STATUS_AMBER)
-                                    .size(10.5)
-                                    .strong()
-                                    .monospace(),
-                                )
-                                .clicked()
-                            {
+                            let avail_btn = styled_button(
+                                &format!("ATUALIZAÇÃO {} DISPONÍVEL", info.latest_version),
+                                11.5,
+                                Color32::BLACK,
+                                p.status_amber,
+                                p.status_amber,
+                            );
+                            if ui.add(avail_btn).clicked() {
                                 self.show_update_banner = true;
                             }
                         }
                         UpdateStatus::UpToDate => {
+                            let up_btn = styled_button(
+                                &format!("v{} ATUALIZADO", CURRENT_VERSION),
+                                11.5,
+                                p.status_emerald_text,
+                                p.bg_elevated,
+                                p.status_emerald,
+                            );
                             if ui
-                                .small_button(
-                                    RichText::new(format!("v{} ATUALIZADO", CURRENT_VERSION))
-                                        .size(10.5)
-                                        .color(STATUS_EMERALD)
-                                        .monospace(),
-                                )
+                                .add(up_btn)
                                 .on_hover_text("Clique para verificar novamente")
                                 .clicked()
                             {
                                 self.trigger_manual_update_check();
                             }
                         }
-                        UpdateStatus::Downloading(p) => {
+                        UpdateStatus::Downloading(prog) => {
                             ui.label(
-                                RichText::new(format!("BAIXANDO: {:.0}%", p * 100.0))
-                                    .size(10.5)
-                                    .color(ACCENT_CYAN)
-                                    .monospace(),
+                                RichText::new(format!("BAIXANDO: {:.0}%", prog * 100.0))
+                                    .size(11.5)
+                                    .strong()
+                                    .color(p.accent_bright),
                             );
                         }
                         UpdateStatus::ReadyToRestart(_) => {
                             ui.label(
                                 RichText::new("PRONTO PARA REINICIAR")
-                                    .size(10.5)
-                                    .color(STATUS_EMERALD)
-                                    .monospace(),
+                                    .size(11.5)
+                                    .strong()
+                                    .color(p.status_emerald_text),
                             );
                         }
                         _ => {
-                            if ui
-                                .small_button(
-                                    RichText::new(format!("v{} CHECAR UPDATE", CURRENT_VERSION))
-                                        .size(10.5)
-                                        .color(TEXT_MUTED)
-                                        .monospace(),
-                                )
-                                .clicked()
-                            {
+                            let chk_btn = styled_button(
+                                &format!("v{} VERIFICAR UPDATE", CURRENT_VERSION),
+                                11.5,
+                                p.text_primary,
+                                p.bg_button,
+                                p.border_strong,
+                            );
+                            if ui.add(chk_btn).clicked() {
                                 self.trigger_manual_update_check();
                             }
                         }
@@ -1184,37 +1425,37 @@ impl eframe::App for EyesLiveApp {
 
                     ui.separator();
 
-                    if ui
-                        .small_button(
-                            RichText::new("GITHUB @GABRIELYANDEV")
-                                .size(10.5)
-                                .strong()
-                                .color(ACCENT_CYAN),
-                        )
-                        .on_hover_text(GITHUB_PROFILE_URL)
-                        .clicked()
-                    {
+                    let gh_btn = styled_button(
+                        "GITHUB @GABRIELYANDEV",
+                        11.5,
+                        p.accent_bright,
+                        p.bg_elevated,
+                        p.border_strong,
+                    );
+                    if ui.add(gh_btn).on_hover_text(GITHUB_PROFILE_URL).clicked() {
                         open_browser_url(GITHUB_PROFILE_URL);
                     }
-                    if ui
-                        .small_button(
-                            RichText::new("REPOSITORIO")
-                                .size(10.5)
-                                .strong()
-                                .color(TEXT_PRIMARY),
-                        )
-                        .on_hover_text(GITHUB_REPO_URL)
-                        .clicked()
-                    {
+
+                    let repo_btn = styled_button(
+                        "REPOSITÓRIO",
+                        11.5,
+                        p.text_primary,
+                        p.bg_button,
+                        p.border_strong,
+                    );
+                    if ui.add(repo_btn).on_hover_text(GITHUB_REPO_URL).clicked() {
                         open_browser_url(GITHUB_REPO_URL);
                     }
+
+                    let quit_btn = styled_button(
+                        "ENCERRAR PROCESSO",
+                        11.5,
+                        Color32::WHITE,
+                        p.status_red,
+                        p.status_red,
+                    );
                     if ui
-                        .small_button(
-                            RichText::new("ENCERRAR PROCESSO")
-                                .size(10.5)
-                                .strong()
-                                .color(STATUS_RED),
-                        )
+                        .add(quit_btn)
                         .on_hover_text("Fechar o EyesLive completamente (parar segundo plano)")
                         .clicked()
                     {
@@ -1228,22 +1469,22 @@ impl eframe::App for EyesLiveApp {
         egui::CentralPanel::default()
             .frame(
                 Frame::none()
-                    .fill(BG_BASE)
-                    .inner_margin(Margin::symmetric(18.0, 14.0)),
+                    .fill(p.bg_base)
+                    .inner_margin(Margin::symmetric(20.0, 16.0)),
             )
             .show(ctx, |ui| {
                 if self.active_tab == 0 {
                     egui::ScrollArea::vertical()
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
-                            self.render_dashboard(ctx, ui);
+                            self.render_dashboard(ctx, ui, &p);
                         });
                 } else {
                     let rt_handle = self.rt.handle().clone();
                     if let Some(session) =
                         self.sessions.iter_mut().find(|s| s.id == self.active_tab)
                     {
-                        Self::render_remote_session(ctx, ui, session, &rt_handle);
+                        Self::render_remote_session(ctx, ui, session, &rt_handle, &p);
                     } else {
                         self.active_tab = 0;
                     }
@@ -1253,7 +1494,7 @@ impl eframe::App for EyesLiveApp {
 }
 
 impl EyesLiveApp {
-    fn render_dashboard(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    fn render_dashboard(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, p: &ThemePalette) {
         let cur_port = *self.bound_port.lock().unwrap();
         let lan_endpoint = format!("{}:{}", self.local_ip, cur_port);
         let avail_w = ui.available_width();
@@ -1262,96 +1503,92 @@ impl EyesLiveApp {
         ui.horizontal_wrapped(|ui| {
             ui.vertical(|ui| {
                 ui.label(
-                    RichText::new("ESTACAO DE ACESSO REMOTO  //  SEM LOGIN  //  TEMPO ILIMITADO")
-                        .size(11.0)
-                        .color(ACCENT_CYAN)
-                        .monospace(),
+                    RichText::new("ACESSO REMOTO DIRETO E POR ID  •  SEM LOGIN  •  TEMPO ILIMITADO")
+                        .size(12.0)
+                        .strong()
+                        .color(p.accent_bright),
                 );
                 ui.label(
                     RichText::new("EyesLive Remote Desktop")
-                        .size(22.0)
+                        .size(24.0)
                         .strong()
-                        .color(TEXT_PRIMARY),
+                        .color(p.text_primary),
                 );
             });
         });
 
-        ui.add_space(12.0);
+        ui.add_space(14.0);
 
         // Responsive Breakpoint: 2 columns on wide screens (>= 820px), stacked 1-column on narrower windows
         if avail_w >= 820.0 {
             ui.columns(2, |cols| {
-                self.render_host_card(&mut cols[0], &lan_endpoint);
-                self.render_client_card(&mut cols[1]);
+                self.render_host_card(&mut cols[0], &lan_endpoint, p);
+                self.render_client_card(&mut cols[1], p);
             });
         } else {
-            self.render_host_card(ui, &lan_endpoint);
-            ui.add_space(12.0);
-            self.render_client_card(ui);
+            self.render_host_card(ui, &lan_endpoint, p);
+            ui.add_space(14.0);
+            self.render_client_card(ui, p);
         }
 
-        ui.add_space(12.0);
+        ui.add_space(14.0);
 
         // System Installation & Background Service Card
-        card_frame().show(ui, |ui| {
+        card_frame(p).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
                 draw_status_dot(
                     ui,
                     if self.installed_status {
-                        STATUS_EMERALD
+                        p.status_emerald
                     } else {
-                        ACCENT_BLUE
+                        p.accent_primary
                     },
                 );
                 ui.label(
-                    RichText::new("INSTALACAO NO SISTEMA E EXECUCAO EM SEGUNDO PLANO")
-                        .size(12.0)
+                    RichText::new("INSTALAÇÃO NO SISTEMA E EXECUÇÃO EM SEGUNDO PLANO")
+                        .size(13.0)
                         .strong()
-                        .color(ACCENT_CYAN)
-                        .monospace(),
+                        .color(p.accent_bright),
                 );
                 ui.separator();
                 ui.label(
                     RichText::new(if self.installed_status {
-                        format!(
-                            "INSTALADO ({})",
-                            get_installed_exe_path().display()
-                        )
+                        format!("INSTALADO ({})", get_installed_exe_path().display())
                     } else {
-                        "MODO PORTATIL (NAO INSTALADO)".to_string()
+                        "MODO PORTÁTIL (NÃO INSTALADO)".to_string()
                     })
-                    .size(11.0)
+                    .size(12.0)
+                    .strong()
                     .color(if self.installed_status {
-                        STATUS_EMERALD
+                        p.status_emerald_text
                     } else {
-                        TEXT_MUTED
-                    })
-                    .monospace(),
+                        p.text_muted
+                    }),
                 );
             });
 
-            ui.add_space(8.0);
+            ui.add_space(10.0);
 
             ui.horizontal_wrapped(|ui| {
                 let install_label = if self.installed_status {
-                    "ATUALIZAR INSTALACAO LOCAL E ATALHOS"
+                    "ATUALIZAR INSTALAÇÃO LOCAL E ATALHOS"
                 } else {
                     "INSTALAR EYESLIVE E ATIVAR SEGUNDO PLANO"
                 };
 
-                let install_btn = egui::Button::new(
-                    RichText::new(install_label)
-                        .size(11.5)
-                        .strong()
-                        .color(Color32::WHITE),
-                )
-                .fill(STATUS_EMERALD);
+                let install_btn = styled_button(
+                    install_label,
+                    12.5,
+                    Color32::WHITE,
+                    p.status_emerald,
+                    p.status_emerald,
+                );
 
                 if ui
                     .add(install_btn)
                     .on_hover_text(
-                        "Copia o executavel para %LOCALAPPDATA%\\EyesLive, cria atalhos na Area de Trabalho e Menu Iniciar e configura execucao em segundo plano",
+                        "Copia o executável para %LOCALAPPDATA%\\EyesLive, cria atalhos na Área de Trabalho e Menu Iniciar e configura execução em segundo plano",
                     )
                     .clicked()
                 {
@@ -1360,27 +1597,27 @@ impl EyesLiveApp {
                             self.installed_status = true;
                             self.autostart_enabled = true;
                             self.keep_in_background = true;
-                            self.install_feedback = Some((
-                                format!("Instalado com sucesso em: {}", path),
-                                STATUS_EMERALD,
-                            ));
+                            self.install_feedback =
+                                Some((format!("Instalado com sucesso em: {}", path), true));
                         }
                         Err(e) => {
                             self.install_feedback =
-                                Some((format!("Erro ao instalar: {}", e), STATUS_RED));
+                                Some((format!("Erro ao instalar: {}", e), false));
                         }
                     }
                 }
 
+                let tray_btn = styled_button(
+                    "OCULTAR PARA A BANDEJA DO SISTEMA AGORA",
+                    12.5,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
                 if ui
-                    .button(
-                        RichText::new("OCULTAR PARA A BANDEJA DO SISTEMA AGORA")
-                            .size(11.5)
-                            .strong()
-                            .color(ACCENT_CYAN),
-                    )
+                    .add(tray_btn)
                     .on_hover_text(
-                        "Remove da barra de tarefas e mantem na Bandeja do Sistema (perto do relogio); clique no icone da bandeja para reabrir",
+                        "Remove da barra de tarefas e mantém na Bandeja do Sistema (perto do relógio); clique no ícone da bandeja para reabrir",
                     )
                     .clicked()
                 {
@@ -1388,26 +1625,26 @@ impl EyesLiveApp {
                 }
 
                 if self.installed_status {
-                    if ui
-                        .button(
-                            RichText::new("DESINSTALAR DO SISTEMA")
-                                .size(11.5)
-                                .color(STATUS_RED),
-                        )
-                        .clicked()
-                    {
+                    let uninst_btn = styled_button(
+                        "DESINSTALAR DO SISTEMA",
+                        12.5,
+                        Color32::WHITE,
+                        p.status_red,
+                        p.status_red,
+                    );
+                    if ui.add(uninst_btn).clicked() {
                         let _ = uninstall_application();
                         self.installed_status = is_installed();
                         self.autostart_enabled = is_autostart_enabled();
                         self.install_feedback = Some((
-                            "Atalhos e inicializacao automatica removidos.".into(),
-                            STATUS_AMBER,
+                            "Atalhos e inicialização automática removidos.".into(),
+                            false,
                         ));
                     }
                 }
             });
 
-            ui.add_space(6.0);
+            ui.add_space(8.0);
 
             ui.vertical(|ui| {
                 if ui
@@ -1416,7 +1653,8 @@ impl EyesLiveApp {
                         RichText::new(
                             "Iniciar automaticamente em segundo plano junto com o Windows",
                         )
-                        .size(12.5),
+                        .size(13.5)
+                        .color(p.text_primary),
                     )
                     .changed()
                 {
@@ -1426,80 +1664,90 @@ impl EyesLiveApp {
                 ui.checkbox(
                     &mut self.keep_in_background,
                     RichText::new(
-                        "Continuar rodando em segundo plano ao fechar a janela no botao (X)",
+                        "Continuar rodando na Bandeja do Sistema ao fechar ou minimizar a janela",
                     )
-                    .size(12.5),
+                    .size(13.5)
+                    .color(p.text_primary),
                 );
             });
 
-            if let Some((ref msg, color)) = self.install_feedback {
-                ui.add_space(4.0);
-                ui.label(RichText::new(msg).size(11.5).color(color).monospace());
+            if let Some((ref msg, ok)) = self.install_feedback {
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new(msg)
+                        .size(12.5)
+                        .strong()
+                        .color(if ok {
+                            p.status_emerald_text
+                        } else {
+                            p.status_amber
+                        }),
+                );
             }
         });
 
-        ui.add_space(12.0);
+        ui.add_space(14.0);
 
-        // Release, Updates & Credits Card (fully wrapped for any window width)
-        card_frame().show(ui, |ui| {
+        // Release, Updates & Credits Card
+        card_frame(p).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
-                draw_status_dot(ui, ACCENT_CYAN);
+                draw_status_dot(ui, p.accent_bright);
                 ui.label(
                     RichText::new(format!(
-                        "EYESLIVE v{}  //  POR {} ({})",
+                        "EYESLIVE v{}  •  DESENVOLVIDO POR {} ({})",
                         CURRENT_VERSION,
                         AUTHOR_NAME.to_uppercase(),
                         AUTHOR_SIGNATURE
                     ))
-                    .size(12.0)
+                    .size(13.0)
                     .strong()
-                    .monospace(),
+                    .color(p.text_primary),
                 );
             });
-            ui.add_space(6.0);
+            ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
-                if ui
-                    .button(
-                        RichText::new("VERIFICAR ATUALIZACOES")
-                            .size(11.5)
-                            .strong(),
-                    )
-                    .clicked()
-                {
+                let upd_btn = styled_button(
+                    "VERIFICAR ATUALIZAÇÕES",
+                    12.0,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
+                if ui.add(upd_btn).clicked() {
                     self.trigger_manual_update_check();
                 }
-                if ui
-                    .button(
-                        RichText::new("BAIXAR EXECUTAVEL PORTATIL (.EXE)")
-                            .size(11.5)
-                            .strong()
-                            .color(ACCENT_CYAN),
-                    )
-                    .clicked()
-                {
+
+                let dl_exe_btn = styled_button(
+                    "BAIXAR EXECUTÁVEL PORTÁTIL (.EXE)",
+                    12.0,
+                    Color32::WHITE,
+                    p.accent_primary,
+                    p.accent_bright,
+                );
+                if ui.add(dl_exe_btn).clicked() {
                     open_browser_url(GITHUB_RELEASES_PAGE);
                 }
-                if ui
-                    .button(
-                        RichText::new("PERFIL GITHUB @GABRIELYANDEV")
-                            .size(11.5)
-                            .strong()
-                            .color(ACCENT_CYAN),
-                    )
-                    .clicked()
-                {
+
+                let prof_btn = styled_button(
+                    "PERFIL GITHUB @GABRIELYANDEV",
+                    12.0,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
+                if ui.add(prof_btn).clicked() {
                     open_browser_url(GITHUB_PROFILE_URL);
                 }
-                if ui
-                    .button(
-                        RichText::new("REPOSITORIO NO GITHUB")
-                            .size(11.5)
-                            .strong()
-                            .color(Color32::WHITE),
-                    )
-                    .clicked()
-                {
+
+                let rep_btn = styled_button(
+                    "REPOSITÓRIO OFICIAL NO GITHUB",
+                    12.0,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
+                if ui.add(rep_btn).clicked() {
                     open_browser_url(GITHUB_REPO_URL);
                 }
             });
@@ -1511,6 +1759,7 @@ impl EyesLiveApp {
         ui: &mut egui::Ui,
         session: &mut RemoteSession,
         rt: &tokio::runtime::Handle,
+        p: &ThemePalette,
     ) {
         let (connected, status, remote_w, remote_h, remote_clip, file_ack, frames_rx, ping_rtt) = {
             let mut st = session.state.lock().unwrap();
@@ -1550,34 +1799,39 @@ impl EyesLiveApp {
             let _ = session.tx.send(Packet::Ping(now_ms));
         }
 
-        // Responsive Session Control Bar (wrapped cleanly so controls never clip off-screen)
-        pill_frame(BG_CARD, BORDER_SUBTLE).show(ui, |ui| {
+        // Responsive Session Control Bar
+        pill_frame(p.bg_card, p.border_subtle).show(ui, |ui| {
             ui.set_width(ui.available_width());
             // Row 1: Connection Status, Ping, Actions
             ui.horizontal_wrapped(|ui| {
                 draw_status_dot(
                     ui,
                     if connected {
-                        STATUS_EMERALD
+                        p.status_emerald
                     } else {
-                        STATUS_AMBER
+                        p.status_amber
                     },
                 );
-                ui.label(RichText::new(&status).size(12.0).strong());
+                ui.label(
+                    RichText::new(&status)
+                        .size(13.0)
+                        .strong()
+                        .color(p.text_primary),
+                );
 
                 if let Some(rtt) = ping_rtt {
                     let color = if rtt < 40 {
-                        STATUS_EMERALD
+                        p.status_emerald_text
                     } else if rtt < 100 {
-                        STATUS_AMBER
+                        p.status_amber
                     } else {
-                        STATUS_RED
+                        p.status_red_text
                     };
                     ui.separator();
                     draw_status_dot(ui, color);
                     ui.label(
                         RichText::new(format!("PING: {}ms", rtt))
-                            .size(11.5)
+                            .size(12.0)
                             .color(color)
                             .strong()
                             .monospace(),
@@ -1585,27 +1839,38 @@ impl EyesLiveApp {
                 }
 
                 ui.label(
-                    RichText::new(format!("|  {}x{}  |  QUADROS: {}", remote_w, remote_h, frames_rx))
-                        .size(11.0)
-                        .color(TEXT_MUTED)
-                        .monospace(),
+                    RichText::new(format!(
+                        "|  {}x{}  |  QUADROS: {}",
+                        remote_w, remote_h, frames_rx
+                    ))
+                    .size(12.0)
+                    .color(p.text_secondary)
+                    .monospace(),
                 );
 
                 ui.separator();
 
-                if ui
-                    .button(RichText::new("ENVIAR ARQUIVO").size(11.0).strong())
-                    .clicked()
-                {
+                let send_file_btn = styled_button(
+                    "ENVIAR ARQUIVO",
+                    11.5,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
+                if ui.add(send_file_btn).clicked() {
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
                         session.send_file(path, rt);
                     }
                 }
 
-                if ui
-                    .button(RichText::new("SINCRONIZAR CLIPBOARD").size(11.0).strong())
-                    .clicked()
-                {
+                let clip_btn = styled_button(
+                    "SINCRONIZAR CLIPBOARD",
+                    11.5,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
+                if ui.add(clip_btn).clicked() {
                     if let Ok(mut cb) = arboard::Clipboard::new() {
                         if let Ok(txt) = cb.get_text() {
                             let _ = session.tx.send(Packet::ClipboardText { text: txt });
@@ -1614,14 +1879,19 @@ impl EyesLiveApp {
                 }
 
                 if let Some(ack) = file_ack {
-                    ui.label(RichText::new(ack).size(11.0).color(STATUS_EMERALD));
+                    ui.label(
+                        RichText::new(ack)
+                            .size(12.0)
+                            .strong()
+                            .color(p.status_emerald_text),
+                    );
                 }
                 if !remote_clip.is_empty() {
                     let preview: String = remote_clip.chars().take(18).collect();
                     ui.label(
                         RichText::new(format!("CLIP: {}", preview))
-                            .size(11.0)
-                            .color(TEXT_MUTED)
+                            .size(11.5)
+                            .color(p.text_muted)
                             .monospace(),
                     );
                 }
@@ -1633,8 +1903,15 @@ impl EyesLiveApp {
             ui.horizontal_wrapped(|ui| {
                 let mut changed = false;
 
+                let fast_btn = styled_button(
+                    "MODO RÁPIDO",
+                    11.5,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
                 if ui
-                    .small_button(RichText::new("MODO RAPIDO").size(11.0).strong())
+                    .add(fast_btn)
                     .on_hover_text("30 FPS, JPEG 50, Escala 75%")
                     .clicked()
                 {
@@ -1643,8 +1920,16 @@ impl EyesLiveApp {
                     session.scale_setting = 75;
                     changed = true;
                 }
+
+                let bal_btn = styled_button(
+                    "EQUILIBRADO",
+                    11.5,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
                 if ui
-                    .small_button(RichText::new("EQUILIBRADO").size(11.0).strong())
+                    .add(bal_btn)
                     .on_hover_text("25 FPS, JPEG 65, Escala 75%")
                     .clicked()
                 {
@@ -1653,8 +1938,16 @@ impl EyesLiveApp {
                     session.scale_setting = 75;
                     changed = true;
                 }
+
+                let hq_btn = styled_button(
+                    "ALTA RESOLUÇÃO",
+                    11.5,
+                    p.text_primary,
+                    p.bg_button,
+                    p.border_strong,
+                );
                 if ui
-                    .small_button(RichText::new("ALTA RESOLUCAO").size(11.0).strong())
+                    .add(hq_btn)
                     .on_hover_text("20 FPS, JPEG 80, Escala 100%")
                     .clicked()
                 {
@@ -1676,7 +1969,12 @@ impl EyesLiveApp {
                     .add(egui::Slider::new(&mut session.scale_setting, 40..=100).text("Escala %"))
                     .changed();
                 changed |= ui
-                    .checkbox(&mut session.view_only, "Somente Leitura")
+                    .checkbox(
+                        &mut session.view_only,
+                        RichText::new("Somente Leitura")
+                            .size(12.5)
+                            .color(p.text_primary),
+                    )
                     .changed();
 
                 if changed {
@@ -1724,7 +2022,7 @@ impl EyesLiveApp {
                         ui.painter().rect_stroke(
                             rect,
                             Rounding::same(4.0),
-                            Stroke::new(1.0_f32, BORDER_SUBTLE),
+                            Stroke::new(1.0_f32, p.border_subtle),
                         );
 
                         if !session.view_only {
@@ -1787,14 +2085,14 @@ impl EyesLiveApp {
                 });
             }
         } else {
-            card_frame().show(ui, |ui| {
+            card_frame(p).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.centered_and_justified(|ui| {
                     ui.label(
-                        RichText::new("AGUARDANDO STREAM DE VIDEO DO HOST REMOTO...")
-                            .size(13.0)
-                            .color(TEXT_MUTED)
-                            .monospace(),
+                        RichText::new("AGUARDANDO TRANSMISSÃO DE VÍDEO DO COMPUTADOR REMOTO...")
+                            .size(14.0)
+                            .strong()
+                            .color(p.text_secondary),
                     );
                 });
             });

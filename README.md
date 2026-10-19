@@ -1,112 +1,85 @@
-# EyesLive — Remote Desktop System
+# EyesLive Remote Desktop
 
-[![Download Windows Executable](https://img.shields.io/badge/Download%20.exe-Windows%20(64--bit)-brightgreen?style=for-the-badge&logo=windows)](https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe)
-[![GitHub Releases](https://img.shields.io/badge/GitHub-Releases-blue?style=for-the-badge&logo=github)](https://github.com/gabrielyandev/eyeslive/releases)
-[![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org)
+[![Download Windows (.exe)](https://img.shields.io/badge/Download-Windows%2064--bit%20(.exe)-2563eb?style=for-the-badge&logo=windows)](https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe)
+[![Releases](https://img.shields.io/badge/GitHub-Releases-0f172a?style=for-the-badge&logo=github)](https://github.com/gabrielyandev/eyeslive/releases)
+[![Licença](https://img.shields.io/badge/Plataforma-Windows%2010%20%2F%2011-10b981?style=for-the-badge)](https://github.com/gabrielyandev/eyeslive)
 
-> **Execucao Direta Sem Terminal + Modo Segundo Plano**  
-> Baixe diretamente o executavel **[`eyeslive.exe`](https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe)** pronto para uso.  
-> Execute diretamente em interface grafica nativa (`windows_subsystem = "windows"`) ou instale no sistema em 1 clique para iniciar automaticamente e permanecer ativo em segundo plano.
+**EyesLive** é um software nativo de acesso remoto de alta performance para Windows. Permite conectar e controlar computadores remotamente por **EyesLive ID** (através da internet) ou **endereço IP direto** (rede local / VPN), sem necessidade de cadastro, sem login obrigatório e sem limite de tempo de sessão.
 
 ---
 
-## Download do Executavel (.exe)
+## Download e Instalação
 
-| Plataforma | Arquivo Executavel | Instrucoes |
+| Versão | Download | Descrição |
 | :--- | :--- | :--- |
-| **Windows 10 / 11 (64-bit)** | [**`eyeslive.exe` (Download Direto)**](https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe) | Baixe e execute diretamente em janela grafica nativa sem console, ou clique em `INSTALAR EYESLIVE E ATIVAR SEGUNDO PLANO` no painel. |
-| **Historico de Releases** | [**Pagina de Releases do Repositorio**](https://github.com/gabrielyandev/eyeslive/releases) | Todas as versoes e notas de lancamento. |
+| **Windows 10 / 11 (x64)** | [**Baixar `eyeslive.exe`**](https://github.com/gabrielyandev/eyeslive/releases/latest/download/eyeslive.exe) | Executável único: pode ser usado em **Modo Portátil** (sem instalação) ou instalado no sistema em 1 clique. |
+| **Todas as Versões** | [**Página de Releases**](https://github.com/gabrielyandev/eyeslive/releases) | Histórico de versões, notas de atualização e binários oficiais. |
 
 ---
 
-## Tela de Autorizacao de Acesso Remoto (Consent Modal)
+## Principais Recursos
 
-Quando outro dispositivo solicita conexao a esta maquina (Host), o **EyesLive** exibe automaticamente uma **Janela Modal de Autorizacao de Seguranca** (restaurando a janela caso esteja minimizada em segundo plano) com:
-- **Identificacao do Solicitante** e **Endereco IP de Origem**.
-- **Contagem Regressiva de Seguranca (60 segundos)**: se nenhuma acao for tomada, a conexao e recusada automaticamente.
-- **Tres Niveis de Decisao Imediata**:
-  1. `PERMITIR ACESSO COMPLETO (TELA + MOUSE E TECLADO)`: libera transmissao de video e injecao de entrada.
-  2. `SOMENTE VISUALIZACAO`: permite que o cliente veja a tela, mas bloqueia no Host qualquer tentativa de controlar mouse ou teclado.
-  3. `RECUSAR CONEXAO`: rejeita o acesso imediatamente.
-- Opcao configuravel no Painel Principal para ativar ou desativar a solicitacao na tela (para casos de acesso nao supervisionado protegido por PIN).
-
----
-
-## Instalacao no Sistema e Execucao em Segundo Plano
-
-O **EyesLive** possui instalador nativo integrado (`src/installer.rs`):
-1. **Instalacao em 1 Clique**: O botao `INSTALAR EYESLIVE E ATIVAR SEGUNDO PLANO` copia o binario para `%LOCALAPPDATA%\EyesLive\eyeslive.exe` e cria atalhos na **Area de Trabalho** e no **Menu Iniciar** sem exigir privilegios de administrador.
-2. **Inicializacao com o Windows (`--background`)**: Registra automaticamente o aplicativo em `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` para iniciar minimizado em segundo plano junto com o sistema.
-3. **Permanencia em Segundo Plano ao Fechar (`X`)**: Ao clicar no botao `X` da janela (ou em `MINIMIZAR PARA SEGUNDO PLANO AGORA`), o aplicativo nao encerra o servidor Host — ele permanece em segundo plano aguardando conexoes e salta automaticamente para a frente quando alguem solicita acesso. Para fechar completamente o processo, basta clicar em `ENCERRAR PROCESSO` na barra inferior.
+- **Conexão Simples por ID ou IP**: Conecte-se informando apenas o **EyesLive ID** de 9 dígitos (ex: `462-152-868`) para acesso externo ou o endereço **IP:Porta** para conexões diretas em rede local/VPN.
+- **Zero Login e Tempo Ilimitado**: Sem criação de contas, sem assinaturas e sem interrupções ou limites de duração nas sessões.
+- **Múltiplas Sessões Simultâneas**: Controle vários computadores ao mesmo tempo através de abas independentes dentro da mesma janela.
+- **Autorização na Tela e PIN de Segurança**:
+  - Ao receber uma tentativa de conexão, o computador exibe um alerta permitindo **Acesso Completo (Tela + Controle)**, **Somente Visualização** ou **Recusar Conexão**.
+  - Suporte a **PIN de Segurança** configurável para acesso não supervisionado.
+- **Bandeja do Sistema (System Tray) e Segundo Plano**:
+  - Opção de instalação em 1 clique com criação automática de atalhos na Área de Trabalho e no Menu Iniciar.
+  - Permanece ativo discretamente ao lado do relógio do Windows e pode iniciar automaticamente junto com o sistema.
+- **Transmissão Fluida e Transferência de Arquivos**:
+  - Perfis rápidos de qualidade (**Modo Rápido**, **Equilibrado** e **Alta Resolução**) com ajuste em tempo real de FPS, compressão e escala.
+  - Sincronização de área de transferência (Clipboard) e envio direto de arquivos entre máquinas.
+- **Temas Escuro Suave e Claro**: Interface de alto contraste com alternância instantânea entre **Modo Escuro Suave** e **Modo Claro**.
+- **Atualizador Automático Integrado**: Verifica, baixa e aplica novas versões diretamente pela interface do programa.
 
 ---
 
-## Notificacao e Atualizacao Automatica Integrada
+## Como Usar
 
-1. **Verificacao Automatica ao Iniciar**: Consulta o repositorio GitHub silenciosamente em segundo plano.
-2. **Aviso de Nova Versao**: Exibe uma barra destacada no topo da interface informando a versao disponivel.
-3. **Atualizacao em 1 Clique**: Clique em `BAIXAR E ATUALIZAR AUTOMATICAMENTE (.EXE)` para baixar a nova versao e reiniciar atualizado.
-4. **Verificacao Manual**: Botao `VERIFICAR ATUALIZACOES NO REPOSITORIO` disponivel no Painel de Controle e na barra inferior de status.
+### 1. Receber Acesso neste Computador (Host)
+1. Abra o **EyesLive**.
+2. Compartilhe seu **EyesLive ID** (ou seu endereço IP local) exibido no painel **Este Dispositivo**.
+3. Quando o parceiro solicitar conexão, escolha na janela de confirmação se deseja liberar o controle completo ou apenas a visualização da tela.
+4. *(Opcional)* Defina um **PIN de Segurança** caso queira acessar seu próprio computador remotamente sem precisar confirmar na tela.
 
----
-
-## Caracteristicas Principais
-
-- **Operacao Sem Autenticacao Centralizada**: Conexao direta via endereco IP e porta ou por meio de identificadores unicos (Desk ID), sem requisitos de cadastro ou login em nuvem.
-- **Sessoes Continuas e Ilimitadas**: Ausencia de desconexoes programadas ou cronometros de sessao.
-- **Interface Multi-Abas Concorrente**: Conecte e controle multiplas estacoes remotas simultaneamente em abas independentes na mesma janela.
-- **Interface Dark Moderna Sem Emojis**: Tema escuro customizado em tons Slate/Zinc com indicadores geometricos de status, tipografia tecnica e atalhos diretos para o GitHub do autor.
-- **Transmissao de Video de Baixa Latencia (Zero Bufferbloat)**: Pipeline em tempo real com descarte automatico de quadros obsoletos, envio exclusivo do quadro mais recente, deteccao de tela estatica (dirty hash check) e downscaling dinamico (50%, 75%, 100%).
-- **TCP_NODELAY no Host e Relay**: Desativacao do algoritmo de Nagle em toda a cadeia de conexao para eliminar delays em movimentacao de cursor e digitacao.
-- **Perfis de Desempenho e Medicao de Ping**: Indicador visual de latencia RTT (ms) na barra de controle e alternancia rapida em 1 clique (`MODO RAPIDO`, `EQUILIBRADO`, `ALTA RESOLUCAO`).
-- **Sincronizacao de Area de Transferencia e Transferencia de Arquivos**: Troca bidirecional de texto e envio de arquivos fracionados em blocos com confirmacao de recebimento (ACK).
+### 2. Acessar Outro Computador (Cliente)
+1. No painel **Nova Conexão**, digite o **EyesLive ID** ou o **IP:Porta** do computador que deseja acessar.
+2. Informe o PIN caso o computador remoto tenha configurado um.
+3. Clique em **Conectar e Iniciar Sessão Remota**.
 
 ---
 
-## Arquitetura do Codigo
+## Parâmetros de Linha de Comando (Opcional)
 
-| Arquivo | Funcao Principal |
-| :--- | :--- |
-| `Cargo.toml` | Manifesto do projeto com dependencias nativas (`eframe`, `tokio`, `screenshots`, `enigo`, `arboard`, `bincode`, `ureq`). |
-| `src/main.rs` | Ponto de entrada da aplicacao, interface grafica moderna em `egui`/`eframe`, modal de autorizacao de acesso e gerenciamento de segundo plano. |
-| `src/host.rs` | Motor de captura de tela, fila de autorizacao de acesso (`PendingConsent`), codificacao JPEG e injecao de eventos locais. |
-| `src/installer.rs` | Instalador nativo em `%LOCALAPPDATA%\EyesLive`, criacao de atalhos no Windows e registro de inicializacao automatica em segundo plano. |
-| `src/viewer.rs` | Cliente de visualizacao assincrono multi-sessao, decodificacao de quadros de imagem e envio de acoes do usuario. |
-| `src/protocol.rs` | Definicao das estruturas de pacotes e do protocolo binario serializado via `bincode` sobre transporte TCP assincrono. |
-| `src/relay.rs` | Servidor de retransmissao independente para conectar clientes e hosts utilizando Desk IDs. |
-| `src/updater.rs` | Verificador e instalador automatico de novas releases diretamente do GitHub. |
-
----
-
-## Instrucoes de Compilacao e Execucao
-
-### 1. Compilar e Iniciar em Modo de Producao
+O executável suporta parâmetros adicionais para automação:
 
 ```powershell
-# Compilacao com otimizacoes completas
+# Instalar silenciosamente no perfil do usuário e iniciar na Bandeja do Sistema
+eyeslive.exe --install --background
+
+# Executar um servidor Relay privado próprio (para redes corporativas isoladas)
+eyeslive.exe --relay 0.0.0.0:9091
+```
+
+---
+
+## Compilando a partir do Código-Fonte
+
+Caso deseje compilar o projeto manualmente em seu ambiente:
+
+```powershell
+git clone https://github.com/gabrielyandev/eyeslive.git
+cd eyeslive
 cargo build --release
-
-# Executar a aplicacao completa (Interface Grafica + Host + Viewer)
-cargo run --release
 ```
 
-### 2. Instalar e Executar em Segundo Plano via Linha de Comando
-
-```powershell
-# Instalar no sistema e iniciar em segundo plano:
-cargo run --release -- --install --background
-```
-
-### 3. Executar como Servidor Relay Dedicado
-
-```powershell
-cargo run --release -- --relay 0.0.0.0:9091
-```
+O executável otimizado será gerado em `target\release\eyeslive.exe`.
 
 ---
 
-## Creditos e Autoria
+## Autor
 
-- **Autor e Desenvolvedor**: Gabriel Yan ([@gabrielyandev](https://github.com/gabrielyandev))
-- **Repositorio Oficial**: [https://github.com/gabrielyandev/eyeslive](https://github.com/gabrielyandev/eyeslive)
-- **Perfil do Autor**: [https://github.com/gabrielyandev](https://github.com/gabrielyandev)
+Desenvolvido por **Gabriel Yan** ([@gabrielyandev](https://github.com/gabrielyandev))  
+Repositório oficial: [github.com/gabrielyandev/eyeslive](https://github.com/gabrielyandev/eyeslive)

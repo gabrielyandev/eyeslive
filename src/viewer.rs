@@ -142,7 +142,9 @@ async fn run_viewer_connection(
         };
         TcpStream::connect(&addr).await?
     } else if let Some(relay) = relay_addr {
-        let mut s = TcpStream::connect(&relay).await?;
+        let mut s = TcpStream::connect(&relay)
+            .await
+            .map_err(|_| anyhow::anyhow!("Não foi possível conectar à rede de resolução de ID"))?;
         send_packet(
             &mut s,
             &Packet::ConnectToHost {
@@ -153,12 +155,11 @@ async fn run_viewer_connection(
         match recv_packet(&mut s).await? {
             Packet::RelayStatus { ok: true, .. } => s,
             Packet::RelayStatus { ok: false, message } => anyhow::bail!(message),
-            _ => anyhow::bail!("Resposta inesperada do Relay"),
+            _ => anyhow::bail!("Resposta inesperada do servidor de conexão"),
         }
     } else {
         anyhow::bail!(
-            "Para conectar usando EyesLive ID ('{}'), marque a opção 'Usar Servidor Relay por ID' e configure o endereço do Relay, ou conecte diretamente via IP:Porta (ex: {}:{})",
-            target,
+            "Destino inválido ('{}'). Informe um EyesLive ID (ex: 462-152-868) ou IP:Porta (ex: 192.168.1.50:{})",
             target,
             crate::protocol::DEFAULT_HOST_PORT
         );
@@ -169,7 +170,8 @@ async fn run_viewer_connection(
     send_packet(
         &mut stream,
         &Packet::Hello {
-            client_name: "EyesLive Viewer".into(),
+            client_name: std::env::var("COMPUTERNAME")
+                .unwrap_or_else(|_| "EyesLive Viewer".into()),
             pin,
             signature: AUTHOR_SIGNATURE.into(),
         },
@@ -196,7 +198,7 @@ async fn run_viewer_connection(
             st.remote_width = screen_width;
             st.remote_height = screen_height;
             st.status_text = format!(
-                "ONLINE — Conectado a {} (ID {}) — Sessao Ilimitada",
+                "ONLINE — Conectado a {} (ID {}) — Sessão Ilimitada",
                 host_name, desk_id
             );
         }
