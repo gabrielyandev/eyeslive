@@ -16,6 +16,7 @@ mod host;
 mod installer;
 mod protocol;
 mod relay;
+mod tray;
 mod updater;
 mod viewer;
 
@@ -180,8 +181,11 @@ fn main() -> eframe::Result<()> {
 
     let start_in_background = args.iter().any(|a| a == "--background");
 
+    tray::init_system_tray();
+
     let viewport = egui::ViewportBuilder::default()
-        .with_title("EyesLive — Remote Desktop [by Gabriel Yan @gabrielyandev]")
+        .with_title(tray::MAIN_WINDOW_TITLE)
+        .with_icon(std::sync::Arc::new(tray::build_egui_icon()))
         .with_inner_size([1180.0, 760.0])
         .with_min_inner_size([640.0, 480.0]);
 
@@ -196,10 +200,6 @@ fn main() -> eframe::Result<()> {
         Box::new(move |cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
             configure_modern_theme(&cc.egui_ctx);
-            if start_in_background {
-                cc.egui_ctx
-                    .send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-            }
             Ok(Box::new(EyesLiveApp::new(rt, start_in_background)))
         }),
     )
@@ -222,6 +222,7 @@ struct EyesLiveApp {
     installed_status: bool,
     autostart_enabled: bool,
     keep_in_background: bool,
+    pending_initial_hide: bool,
     force_quit: bool,
     install_feedback: Option<(String, Color32)>,
 
@@ -316,10 +317,11 @@ impl EyesLiveApp {
             installed_status,
             autostart_enabled,
             keep_in_background: true,
+            pending_initial_hide: started_in_background,
             force_quit: false,
             install_feedback: if started_in_background {
                 Some((
-                    "Iniciado em modo de segundo plano (Host ativo).".into(),
+                    "Iniciado na Bandeja do Sistema (Host ativo em segundo plano).".into(),
                     STATUS_EMERALD,
                 ))
             } else {
@@ -394,9 +396,7 @@ impl EyesLiveApp {
         let count = guard.len();
 
         if count > self.last_consent_count {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
-            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            tray::restore_from_system_tray(ctx);
             ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(
                 egui::UserAttentionType::Critical,
             ));
@@ -796,13 +796,30 @@ impl EyesLiveApp {
 
 impl eframe::App for EyesLiveApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Intercept window close (X) to keep running in background if enabled
-        if ctx.input(|i| i.viewport().close_requested())
-            && self.keep_in_background
-            && !self.force_quit
-        {
-            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+        if self.pending_initial_hide {
+            self.pending_initial_hide = false;
+            tray::hide_to_system_tray(ctx);
+        }
+
+        if tray::take_restore_request() {
+            tray::restore_from_system_tray(ctx);
+        }
+        if tray::take_hide_request() {
+            tray::hide_to_system_tray(ctx);
+        }
+        if tray::take_quit_request() {
+            self.force_quit = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+
+        // Intercept window close (X) or minimize (_) to send directly to the Windows System Tray
+        let close_req = ctx.input(|i| i.viewport().close_requested());
+        let min_req = ctx.input(|i| i.viewport().minimized == Some(true));
+        if (close_req || min_req) && self.keep_in_background && !self.force_quit {
+            if close_req {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            }
+            tray::hide_to_system_tray(ctx);
         }
 
         ctx.request_repaint_after(Duration::from_millis(16));
@@ -1322,17 +1339,17 @@ impl EyesLiveApp {
 
                 if ui
                     .button(
-                        RichText::new("MINIMIZAR PARA SEGUNDO PLANO AGORA")
+                        RichText::new("OCULTAR PARA A BANDEJA DO SISTEMA AGORA")
                             .size(11.5)
                             .strong()
                             .color(ACCENT_CYAN),
                     )
                     .on_hover_text(
-                        "Oculta a janela mantendo o servidor Host ativo; a janela reabre automaticamente se alguem solicitar acesso",
+                        "Remove da barra de tarefas e mantem na Bandeja do Sistema (perto do relogio); clique no icone da bandeja para reabrir",
                     )
                     .clicked()
                 {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+                    tray::hide_to_system_tray(ctx);
                 }
 
                 if self.installed_status {
